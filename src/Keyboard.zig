@@ -1,0 +1,39 @@
+pub const Keyboard = @This();
+
+const xkb = @cImport({
+    @cInclude("xkbcommon/xkbcommon.h");
+});
+
+xkb_state: *xkb.xkb_state = undefined,
+xkb_context: *xkb.xkb_context = undefined,
+xkb_keymap: *xkb.xkb_keymap = undefined,
+
+pub fn initContext(self: *Keyboard) void {
+    self.xkb_context = xkb.xkb_context_new(xkb.XKB_CONTEXT_NO_FLAGS) orelse unreachable;
+}
+
+pub fn setKeymap(self: *Keyboard, keymap: [*:0]const u8) void {
+    xkb.xkb_keymap_unref(self.xkb_keymap);
+    xkb.xkb_state_unref(self.xkb_state);
+
+    self.xkb_keymap = xkb.xkb_keymap_new_from_string(self.xkb_context, keymap, xkb.XKB_KEYMAP_FORMAT_TEXT_V1, xkb.XKB_KEYMAP_COMPILE_NO_FLAGS) orelse unreachable;
+    self.xkb_state = xkb.xkb_state_new(self.xkb_keymap) orelse unreachable;
+}
+
+pub fn deinit(self: *Keyboard) void {
+    xkb.xkb_keymap_unref(self.xkb_keymap);
+    xkb.xkb_state_unref(self.xkb_state);
+    xkb.xkb_context_unref(self.xkb_context);
+}
+
+pub fn getOneSym(self: Keyboard, keycode: xkb.xkb_keycode_t) u32 {
+    return xkb.xkb_state_key_get_one_sym(self.xkb_state, keycode);
+}
+
+pub fn getName(_: Keyboard, keysym: xkb.xkb_keycode_t, buf: []u8) void {
+    _ = xkb.xkb_keysym_get_name(keysym, @ptrCast(buf), @sizeOf(@TypeOf(buf)));
+}
+
+pub fn updateKey(self: Keyboard, keycode: xkb.xkb_keycode_t, pressed: bool) void {
+    _ = xkb.xkb_state_update_key(self.xkb_state, keycode, if (pressed) xkb.XKB_KEY_DOWN else xkb.XKB_KEY_UP);
+}
