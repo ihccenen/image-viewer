@@ -1,6 +1,7 @@
 const std = @import("std");
 const Window = @import("Window.zig");
 const Renderer = @import("Renderer.zig");
+const Image = @import("Image.zig");
 
 pub const EventType = enum {
     keyboard,
@@ -18,6 +19,11 @@ pub fn main() !void {
 
     var renderer = try Renderer.init();
     defer renderer.deinit();
+
+    var image = try Image.init(std.mem.span(std.os.argv[1]));
+    defer image.deinit();
+
+    renderer.setTexture(image);
 
     var event: Event = undefined;
 

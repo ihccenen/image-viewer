@@ -29,6 +29,12 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("egl");
     exe.linkSystemLibrary("gl");
 
+    exe.addCSourceFiles(.{
+        .root = b.path("src/stb"),
+        .files = &.{"stb_image.c"},
+    });
+    exe.addIncludePath(b.path("src/stb"));
+
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
