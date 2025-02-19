@@ -20,6 +20,7 @@ const c = @cImport({
 });
 
 const Keyboard = @import("Keyboard.zig");
+const Event = @import("Event.zig").Event;
 
 const keycode_offset = 8;
 
@@ -291,8 +292,8 @@ pub fn shouldClose(self: *Window) bool {
 }
 
 pub fn writeKeypress(self: Window) void {
-    var keysym = self.keyboard.getOneSym(self.repeat_keycode + keycode_offset);
-    const event = .{ .typ = .keyboard, .data = &keysym };
+    const keysym = self.keyboard.getOneSym(self.repeat_keycode + keycode_offset);
+    const event = Event{ .keyboard = keysym };
 
     _ = std.posix.write(self.pipe_fds[1], std.mem.asBytes(&event)) catch return;
 }

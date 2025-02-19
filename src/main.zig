@@ -2,15 +2,7 @@ const std = @import("std");
 const Window = @import("Window.zig");
 const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
-
-pub const EventType = enum {
-    keyboard,
-};
-
-pub const Event = struct {
-    typ: EventType = undefined,
-    data: ?*anyopaque = null,
-};
+const Event = @import("Event.zig").Event;
 
 pub fn main() !void {
     var window = Window{};
@@ -34,9 +26,8 @@ pub fn main() !void {
         };
 
         if (size > 0) {
-            switch (event.typ) {
-                .keyboard => {
-                    const keysym = @as(*u32, @ptrCast(@alignCast(event.data))).*;
+            switch (event) {
+                .keyboard => |keysym| {
                     var buf: [128]u8 = undefined;
                     window.keyboard.getName(keysym, &buf);
 
