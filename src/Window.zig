@@ -7,8 +7,6 @@ const wayland = @import("wayland");
 const wl = wayland.client.wl;
 const xdg = wayland.client.xdg;
 
-const gl = @import("gl.zig");
-
 const c = @cImport({
     @cInclude("time.h");
     @cInclude("signal.h");
@@ -20,7 +18,7 @@ const c = @cImport({
 });
 
 const Keyboard = @import("Keyboard.zig");
-const Event = @import("Event.zig").Event;
+const Event = @import("event.zig").Event;
 
 const keycode_offset = 8;
 
@@ -90,10 +88,11 @@ fn xdgToplevelListener(_: *xdg.Toplevel, event: xdg.Toplevel.Event, window: *Win
     switch (event) {
         .configure => |configure| {
             if (configure.width > 0 and configure.height > 0) {
-                window.width = configure.width;
-                window.height = configure.height;
-                wl.EglWindow.resize(window.egl_window, window.width, window.height, 0, 0);
-                gl.glViewport(0, 0, @intCast(window.width), @intCast(window.height));
+                window.width = @intCast(configure.width);
+                window.height = @intCast(configure.height);
+                wl.EglWindow.resize(window.egl_window, @intCast(window.width), @intCast(window.height), 0, 0);
+                const e = Event{ .resize = .{ window.width, window.height } };
+                _ = std.posix.write(window.pipe_fds[1], std.mem.asBytes(&e)) catch return;
             }
         },
         .configure_bounds => {},
@@ -129,8 +128,8 @@ egl_context: c.EGLContext = undefined,
 egl_surface: c.EGLSurface = undefined,
 egl_window: *wl.EglWindow = undefined,
 
-width: i32 = 0,
-height: i32 = 0,
+width: usize = 0,
+height: usize = 0,
 
 keyboard: Keyboard = undefined,
 repeat_keycode: u32 = undefined,

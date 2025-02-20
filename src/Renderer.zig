@@ -89,3 +89,7 @@ pub fn render(self: Renderer, scale: math.Mat4, translate: math.Mat4, projection
     gl.glBindVertexArray(self.vao);
     gl.glDrawElements(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, @ptrFromInt(0));
 }
+
+pub fn viewport(_: Renderer, width: usize, height: usize) void {
+    gl.glViewport(0, 0, @intCast(width), @intCast(height));
+}

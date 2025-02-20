@@ -2,7 +2,7 @@ const std = @import("std");
 const Window = @import("Window.zig");
 const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
-const Event = @import("Event.zig").Event;
+const Event = @import("event.zig").Event;
 const Mat4 = @import("math.zig").Mat4;
 
 pub fn main() !void {
@@ -33,6 +33,10 @@ pub fn main() !void {
                     window.keyboard.getName(keysym, &buf);
 
                     std.debug.print("key: {s}\n", .{@as([*:0]const u8, @ptrCast(&buf))});
+                },
+                .resize => |dim| {
+                    const width, const height = dim;
+                    renderer.viewport(width, height);
                 },
             }
         }
