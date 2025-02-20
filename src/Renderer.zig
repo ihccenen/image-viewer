@@ -3,12 +3,13 @@ pub const Renderer = @This();
 const gl = @import("gl.zig");
 const Shader = @import("Shader.zig");
 const Image = @import("Image.zig");
+const math = @import("math.zig");
 
-shader: Shader = undefined,
-vao: gl.GLuint = 0,
-vbo: gl.GLuint = 0,
-ebo: gl.GLuint = 0,
-texture: gl.GLuint = 0,
+shader: Shader,
+vao: gl.GLuint,
+vbo: gl.GLuint,
+ebo: gl.GLuint,
+texture: gl.GLuint,
 
 pub fn init() !Renderer {
     const vertices = [_]f32{
@@ -73,13 +74,18 @@ pub fn setTexture(_: Renderer, image: Image) void {
     gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, @intCast(image.width), @intCast(image.height), 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, @ptrCast(image.data.ptr));
 }
 
-pub fn render(self: Renderer) void {
+pub fn render(self: Renderer, scale: math.Mat4, translate: math.Mat4, projection: math.Mat4) void {
     gl.glClearColor(0.0, 0.0, 0.0, 1.0);
     gl.glClear(gl.GL_COLOR_BUFFER_BIT);
 
     gl.glBindTexture(gl.GL_TEXTURE_2D, self.texture);
 
     self.shader.use();
+
+    self.shader.setMat4("scale", scale);
+    self.shader.setMat4("translate", translate);
+    self.shader.setMat4("projection", projection);
+
     gl.glBindVertexArray(self.vao);
     gl.glDrawElements(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, @ptrFromInt(0));
 }

@@ -2,6 +2,9 @@ pub const Shader = @This();
 
 const std = @import("std");
 const gl = @import("gl.zig");
+const math = @import("math.zig");
+const Vec3 = math.Vec3;
+const Mat4 = math.Mat4;
 
 const vertex =
     \\ #version 330 core
@@ -9,10 +12,13 @@ const vertex =
     \\ layout (location = 1) in vec2 vTexCoord;
     \\
     \\ out vec2 TexCoord;
+    \\ uniform mat4 scale;
+    \\ uniform mat4 translate;
+    \\ uniform mat4 projection;
     \\
     \\ void main()
     \\ {
-    \\     gl_Position = vec4(vPos, 1.0);
+    \\     gl_Position = projection * translate * scale * vec4(vPos, 1.0);
     \\     TexCoord = vTexCoord;
     \\ }
 ;
@@ -83,4 +89,8 @@ pub fn deinit(self: Shader) void {
 
 pub fn use(self: Shader) void {
     gl.glUseProgram(self.id);
+}
+
+pub fn setMat4(self: Shader, name: [:0]const u8, mat: Mat4) void {
+    gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.id, name), 1, gl.GL_FALSE, @ptrCast(&mat.data));
 }
