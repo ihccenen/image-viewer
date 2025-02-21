@@ -18,6 +18,7 @@ texture: gl.GLuint,
 image: *Image = undefined,
 
 scale: f32 = 1.0,
+fit_screen_scale: f32 = 1.0,
 
 translateX: f32 = 0.0,
 translateY: f32 = 0.0,
@@ -87,9 +88,59 @@ pub fn setTexture(self: *Renderer, image: *Image) void {
 }
 
 pub fn viewport(self: *Renderer, width: usize, height: usize) void {
+    if (self.image.width > self.image.height) {
+        self.fit_screen_scale = @as(f32, @floatFromInt(height)) / @as(f32, @floatFromInt(self.image.height));
+    } else {
+        self.fit_screen_scale = @as(f32, @floatFromInt(width)) / @as(f32, @floatFromInt(self.image.width));
+    }
+
+    if (self.image.width > width or self.image.height > height) {
+        self.scale = self.fit_screen_scale;
+    }
+
     self.viewport_width = width;
     self.viewport_height = height;
     gl.glViewport(0, 0, @intCast(width), @intCast(height));
+}
+
+pub fn toggleFitScreen(self: *Renderer) void {
+    if (self.scale != self.fit_screen_scale) {
+        self.scale = self.fit_screen_scale;
+    } else {
+        self.scale = 1.0;
+    }
+}
+
+pub const Zoom = enum {
+    in,
+    out,
+    fit_screen,
+    reset,
+};
+
+pub fn zoom(self: *Renderer, action: Zoom) void {
+    self.scale = switch (action) {
+        .in => @max(self.scale * @sqrt(2.0), 1.0 / 1024.0),
+        .out => @min(self.scale / @sqrt(2.0), 1024.0),
+        .fit_screen => if (self.scale != self.fit_screen_scale) self.fit_screen_scale else 1.0,
+        .reset => 1.0,
+    };
+}
+
+pub const Direction = enum {
+    up,
+    right,
+    down,
+    left,
+};
+
+pub fn move(self: *Renderer, direction: Direction) void {
+    switch (direction) {
+        .up => self.translateY -= 0.1,
+        .right => self.translateX -= 0.1,
+        .down => self.translateY += 0.1,
+        .left => self.translateX += 0.1,
+    }
 }
 
 pub fn render(self: Renderer) void {
@@ -101,8 +152,8 @@ pub fn render(self: Renderer) void {
     self.shader.use();
 
     self.shader.setMat4("scale", Mat4.scale(.{
-        self.scale * @as(f32, @floatFromInt(self.image.width)) / @as(f32, @floatFromInt(self.viewport_width)),
-        self.scale * @as(f32, @floatFromInt(self.image.height)) / @as(f32, @floatFromInt(self.viewport_height)),
+        self.scale * (@as(f32, @floatFromInt(self.image.width)) / @as(f32, @floatFromInt(self.viewport_width))),
+        self.scale * (@as(f32, @floatFromInt(self.image.height)) / @as(f32, @floatFromInt(self.viewport_height))),
         0.0,
     }));
 

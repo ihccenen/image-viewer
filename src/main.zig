@@ -33,17 +33,21 @@ pub fn main() !void {
                     window.keyboard.getName(keysym, &buf);
 
                     if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "plus") == .eq) {
-                        renderer.scale = @max(renderer.scale * @sqrt(2.0), 1.0 / 1024.0);
+                        renderer.zoom(.in);
                     } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "minus") == .eq) {
-                        renderer.scale = @min(renderer.scale / @sqrt(2.0), 1024.0);
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "l") == .eq) {
-                        renderer.translateX += 0.1;
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "h") == .eq) {
-                        renderer.translateX -= 0.1;
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "j") == .eq) {
-                        renderer.translateY -= 0.1;
+                        renderer.zoom(.out);
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "s") == .eq) {
+                        renderer.zoom(.fit_screen);
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "o") == .eq) {
+                        renderer.zoom(.reset);
                     } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "k") == .eq) {
-                        renderer.translateY += 0.1;
+                        renderer.move(.up);
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "l") == .eq) {
+                        renderer.move(.right);
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "j") == .eq) {
+                        renderer.move(.down);
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "h") == .eq) {
+                        renderer.move(.left);
                     } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "q") == .eq) {
                         window.running = false;
                     }
