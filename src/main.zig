@@ -16,7 +16,7 @@ pub fn main() !void {
     var renderer = try Renderer.init();
     defer renderer.deinit();
 
-    renderer.setTexture(image);
+    renderer.setTexture(&image);
 
     var event: Event = undefined;
 
@@ -32,7 +32,21 @@ pub fn main() !void {
                     var buf: [128]u8 = undefined;
                     window.keyboard.getName(keysym, &buf);
 
-                    std.debug.print("key: {s}\n", .{@as([*:0]const u8, @ptrCast(&buf))});
+                    if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "plus") == .eq) {
+                        renderer.scale = @max(renderer.scale * @sqrt(2.0), 1.0 / 1024.0);
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "minus") == .eq) {
+                        renderer.scale = @min(renderer.scale / @sqrt(2.0), 1024.0);
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "l") == .eq) {
+                        renderer.translateX += 0.1;
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "h") == .eq) {
+                        renderer.translateX -= 0.1;
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "j") == .eq) {
+                        renderer.translateY -= 0.1;
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "k") == .eq) {
+                        renderer.translateY += 0.1;
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "q") == .eq) {
+                        window.running = false;
+                    }
                 },
                 .resize => |dim| {
                     const width, const height = dim;
@@ -41,26 +55,7 @@ pub fn main() !void {
             }
         }
 
-        renderer.render(
-            Mat4.scale(.{
-                @as(f32, @floatFromInt(image.width)) / 2.0,
-                @as(f32, @floatFromInt(image.height)) / 2.0,
-                0.0,
-            }),
-            Mat4.translate(.{
-                @as(f32, @floatFromInt(window.width)) / 2.0,
-                @as(f32, @floatFromInt(window.height)) / 2.0,
-                0.0,
-            }),
-            Mat4.orthographic(
-                0.0,
-                @floatFromInt(window.width),
-                0.0,
-                @floatFromInt(window.height),
-                -1.0,
-                1.0,
-            ),
-        );
+        renderer.render();
         try window.swapBuffers();
     }
 }

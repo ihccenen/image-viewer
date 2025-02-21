@@ -2,9 +2,7 @@ pub const Shader = @This();
 
 const std = @import("std");
 const gl = @import("gl.zig");
-const math = @import("math.zig");
-const Vec3 = math.Vec3;
-const Mat4 = math.Mat4;
+const Mat4 = @import("math.zig").Mat4;
 
 const vertex =
     \\ #version 330 core
@@ -14,11 +12,10 @@ const vertex =
     \\ out vec2 TexCoord;
     \\ uniform mat4 scale;
     \\ uniform mat4 translate;
-    \\ uniform mat4 projection;
     \\
     \\ void main()
     \\ {
-    \\     gl_Position = projection * translate * scale * vec4(vPos, 1.0);
+    \\     gl_Position = translate * scale * vec4(vPos, 1.0);
     \\     TexCoord = vTexCoord;
     \\ }
 ;

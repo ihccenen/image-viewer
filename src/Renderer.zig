@@ -3,13 +3,24 @@ pub const Renderer = @This();
 const gl = @import("gl.zig");
 const Shader = @import("Shader.zig");
 const Image = @import("Image.zig");
-const math = @import("math.zig");
+const Mat4 = @import("math.zig").Mat4;
 
 shader: Shader,
+
 vao: gl.GLuint,
 vbo: gl.GLuint,
 ebo: gl.GLuint,
+
+viewport_width: usize = 0,
+viewport_height: usize = 0,
+
 texture: gl.GLuint,
+image: *Image = undefined,
+
+scale: f32 = 1.0,
+
+translateX: f32 = 0.0,
+translateY: f32 = 0.0,
 
 pub fn init() !Renderer {
     const vertices = [_]f32{
@@ -70,11 +81,18 @@ pub fn deinit(self: *Renderer) void {
     gl.glDeleteBuffers(1, &self.ebo);
 }
 
-pub fn setTexture(_: Renderer, image: Image) void {
+pub fn setTexture(self: *Renderer, image: *Image) void {
+    self.image = image;
     gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, @intCast(image.width), @intCast(image.height), 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, @ptrCast(image.data.ptr));
 }
 
-pub fn render(self: Renderer, scale: math.Mat4, translate: math.Mat4, projection: math.Mat4) void {
+pub fn viewport(self: *Renderer, width: usize, height: usize) void {
+    self.viewport_width = width;
+    self.viewport_height = height;
+    gl.glViewport(0, 0, @intCast(width), @intCast(height));
+}
+
+pub fn render(self: Renderer) void {
     gl.glClearColor(0.0, 0.0, 0.0, 1.0);
     gl.glClear(gl.GL_COLOR_BUFFER_BIT);
 
@@ -82,14 +100,14 @@ pub fn render(self: Renderer, scale: math.Mat4, translate: math.Mat4, projection
 
     self.shader.use();
 
-    self.shader.setMat4("scale", scale);
-    self.shader.setMat4("translate", translate);
-    self.shader.setMat4("projection", projection);
+    self.shader.setMat4("scale", Mat4.scale(.{
+        self.scale * @as(f32, @floatFromInt(self.image.width)) / @as(f32, @floatFromInt(self.viewport_width)),
+        self.scale * @as(f32, @floatFromInt(self.image.height)) / @as(f32, @floatFromInt(self.viewport_height)),
+        0.0,
+    }));
+
+    self.shader.setMat4("translate", Mat4.translate(.{ self.translateX, self.translateY, 0.0 }));
 
     gl.glBindVertexArray(self.vao);
     gl.glDrawElements(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, @ptrFromInt(0));
-}
-
-pub fn viewport(_: Renderer, width: usize, height: usize) void {
-    gl.glViewport(0, 0, @intCast(width), @intCast(height));
 }
