@@ -4,6 +4,8 @@ const xkb = @cImport({
     @cInclude("xkbcommon/xkbcommon.h");
 });
 
+const keycode_offset = 8;
+
 xkb_state: *xkb.xkb_state = undefined,
 xkb_context: *xkb.xkb_context = undefined,
 xkb_keymap: *xkb.xkb_keymap = undefined,
@@ -27,7 +29,7 @@ pub fn deinit(self: *Keyboard) void {
 }
 
 pub fn getOneSym(self: Keyboard, keycode: xkb.xkb_keycode_t) u32 {
-    return xkb.xkb_state_key_get_one_sym(self.xkb_state, keycode);
+    return xkb.xkb_state_key_get_one_sym(self.xkb_state, keycode + keycode_offset);
 }
 
 pub fn getName(_: Keyboard, keysym: xkb.xkb_keycode_t, buf: []u8) void {
@@ -35,5 +37,5 @@ pub fn getName(_: Keyboard, keysym: xkb.xkb_keycode_t, buf: []u8) void {
 }
 
 pub fn updateKey(self: Keyboard, keycode: xkb.xkb_keycode_t, pressed: bool) void {
-    _ = xkb.xkb_state_update_key(self.xkb_state, keycode, if (pressed) xkb.XKB_KEY_DOWN else xkb.XKB_KEY_UP);
+    _ = xkb.xkb_state_update_key(self.xkb_state, keycode + keycode_offset, if (pressed) xkb.XKB_KEY_DOWN else xkb.XKB_KEY_UP);
 }

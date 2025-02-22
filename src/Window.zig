@@ -20,8 +20,6 @@ const c = @cImport({
 const Keyboard = @import("Keyboard.zig");
 const Event = @import("event.zig").Event;
 
-const keycode_offset = 8;
-
 fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, window: *Window) void {
     switch (event) {
         .keymap => |keymap| {
@@ -31,9 +29,7 @@ fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, window: *Window) 
             window.keyboard.setKeymap(@ptrCast(map_shm));
         },
         .enter => {},
-        .leave => {
-            window.dispatchKey(0, false);
-        },
+        .leave => {},
         .key => |key| {
             window.dispatchKey(key.key, key.state == .pressed);
         },
@@ -291,14 +287,14 @@ pub fn shouldClose(self: *Window) bool {
 }
 
 pub fn writeKeypress(self: Window) void {
-    const keysym = self.keyboard.getOneSym(self.repeat_keycode + keycode_offset);
+    const keysym = self.keyboard.getOneSym(self.repeat_keycode);
     const event = Event{ .keyboard = keysym };
 
     _ = std.posix.write(self.pipe_fds[1], std.mem.asBytes(&event)) catch return;
 }
 
 pub fn dispatchKey(self: *Window, keycode: u32, pressed: bool) void {
-    self.keyboard.updateKey(keycode + keycode_offset, pressed);
+    self.keyboard.updateKey(keycode, pressed);
 
     const its = c.itimerspec{
         .it_value = c.timespec{
