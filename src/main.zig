@@ -16,7 +16,7 @@ pub fn main() !void {
     var renderer = try Renderer.init();
     defer renderer.deinit();
 
-    renderer.setTexture(&image);
+    renderer.setTexture(image);
 
     var event: Event = undefined;
 

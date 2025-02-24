@@ -15,7 +15,8 @@ viewport_width: usize = 0,
 viewport_height: usize = 0,
 
 texture: gl.GLuint,
-image: *Image = undefined,
+texture_width: usize = 0,
+texture_height: usize = 0,
 
 scale: f32 = 1.0,
 fit_screen_scale: f32 = 1.0,
@@ -82,19 +83,20 @@ pub fn deinit(self: *Renderer) void {
     gl.glDeleteBuffers(1, &self.ebo);
 }
 
-pub fn setTexture(self: *Renderer, image: *Image) void {
-    self.image = image;
+pub fn setTexture(self: *Renderer, image: Image) void {
+    self.texture_width = image.width;
+    self.texture_height = image.height;
     gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, @intCast(image.width), @intCast(image.height), 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, @ptrCast(image.data.ptr));
 }
 
 pub fn viewport(self: *Renderer, width: usize, height: usize) void {
-    if (self.image.width > self.image.height) {
-        self.fit_screen_scale = @as(f32, @floatFromInt(height)) / @as(f32, @floatFromInt(self.image.height));
+    if (self.texture_width > self.texture_height) {
+        self.fit_screen_scale = @as(f32, @floatFromInt(height)) / @as(f32, @floatFromInt(self.texture_height));
     } else {
-        self.fit_screen_scale = @as(f32, @floatFromInt(width)) / @as(f32, @floatFromInt(self.image.width));
+        self.fit_screen_scale = @as(f32, @floatFromInt(width)) / @as(f32, @floatFromInt(self.texture_width));
     }
 
-    if (self.image.width > width or self.image.height > height) {
+    if (self.texture_width > width or self.texture_height > height) {
         self.scale = self.fit_screen_scale;
     }
 
@@ -152,8 +154,8 @@ pub fn render(self: Renderer) void {
     self.shader.use();
 
     self.shader.setMat4("scale", Mat4.scale(.{
-        self.scale * (@as(f32, @floatFromInt(self.image.width)) / @as(f32, @floatFromInt(self.viewport_width))),
-        self.scale * (@as(f32, @floatFromInt(self.image.height)) / @as(f32, @floatFromInt(self.viewport_height))),
+        self.scale * (@as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width))),
+        self.scale * (@as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height))),
         0.0,
     }));
 
