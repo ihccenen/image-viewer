@@ -5,19 +5,51 @@ const Image = @import("Image.zig");
 const Event = @import("event.zig").Event;
 const Mat4 = @import("math.zig").Mat4;
 
+pub fn loadImage(image: *Image, paths: [][:0]u8, pipe_fd: std.posix.fd_t, index: usize, step: isize) void {
+    const next_index = @as(isize, @intCast(index)) + step;
+
+    if (next_index >= paths.len or next_index < 0) return;
+
+    image.* = Image.init(paths[@intCast(next_index)]) catch return;
+
+    const event = Event{ .image_loaded = @intCast(next_index) };
+    _ = std.posix.write(pipe_fd, std.mem.asBytes(&event)) catch return;
+}
+
 pub fn main() !void {
-    var image = try Image.init(std.mem.span(std.os.argv[1]));
-    defer image.deinit();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    var paths = std.ArrayList([:0]u8).init(allocator);
+    defer paths.deinit();
+
+    for (std.os.argv[1..]) |arg| {
+        const path = std.mem.span(arg);
+        const ext = std.fs.path.extension(path);
+
+        if (std.mem.eql(u8, ext, ".png")) {
+            try paths.append(path);
+        }
+    }
+
+    if (paths.items.len < 1) {
+        std.debug.print("usage: {s} [image path]\n", .{std.fs.path.basename(std.mem.span(std.os.argv[0]))});
+        return;
+    }
+
+    var index: usize = 0;
 
     var window = Window{};
-    try window.init(image.width, image.height);
+    try window.init(100, 100);
     defer window.deinit();
 
     var renderer = try Renderer.init();
     defer renderer.deinit();
 
+    var image = try Image.init(paths.items[index]);
     renderer.setTexture(image);
+    image.deinit();
 
+    var loading_image: bool = false;
     var event: Event = undefined;
 
     while (!window.shouldClose()) {
@@ -50,11 +82,30 @@ pub fn main() !void {
                         renderer.move(.left);
                     } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "q") == .eq) {
                         window.running = false;
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "n") == .eq) {
+                        if (!loading_image) {
+                            loading_image = true;
+                            var thread = try std.Thread.spawn(.{}, loadImage, .{ &image, paths.items, window.pipe_fds[1], index, 1 });
+                            thread.detach();
+                        }
+                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "p") == .eq) {
+                        if (!loading_image) {
+                            loading_image = true;
+                            var thread = try std.Thread.spawn(.{}, loadImage, .{ &image, paths.items, window.pipe_fds[1], index, -1 });
+                            thread.detach();
+                        }
                     }
                 },
                 .resize => |dim| {
                     const width, const height = dim;
                     renderer.viewport(width, height);
+                },
+                .image_loaded => |new_index| {
+                    loading_image = false;
+                    index = new_index;
+                    renderer.setTexture(image);
+
+                    image.deinit();
                 },
             }
         }
