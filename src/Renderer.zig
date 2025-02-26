@@ -139,9 +139,9 @@ pub const Direction = enum {
 pub fn move(self: *Renderer, direction: Direction) void {
     switch (direction) {
         .up => self.translateY -= 0.1,
-        .right => self.translateX -= 0.1,
+        .right => self.translateX += 0.1,
         .down => self.translateY += 0.1,
-        .left => self.translateX += 0.1,
+        .left => self.translateX -= 0.1,
     }
 }
 
