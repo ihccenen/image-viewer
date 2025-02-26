@@ -61,34 +61,34 @@ pub fn main() !void {
         if (size > 0) {
             switch (event) {
                 .keyboard => |keysym| {
-                    var buf: [128]u8 = undefined;
+                    var buf: [128:0]u8 = undefined;
                     window.keyboard.getName(keysym, &buf);
 
-                    if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "plus") == .eq) {
+                    if (std.mem.orderZ(u8, &buf, "plus") == .eq) {
                         renderer.zoom(.in);
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "minus") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "minus") == .eq) {
                         renderer.zoom(.out);
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "s") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "s") == .eq) {
                         renderer.zoom(.fit_screen);
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "o") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "o") == .eq) {
                         renderer.zoom(.reset);
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "k") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "k") == .eq) {
                         renderer.move(.up);
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "l") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "l") == .eq) {
                         renderer.move(.right);
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "j") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "j") == .eq) {
                         renderer.move(.down);
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "h") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "h") == .eq) {
                         renderer.move(.left);
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "q") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "q") == .eq) {
                         window.running = false;
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "n") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "n") == .eq) {
                         if (!loading_image) {
                             loading_image = true;
                             var thread = try std.Thread.spawn(.{}, loadImage, .{ &image, paths.items, window.pipe_fds[1], index, 1 });
                             thread.detach();
                         }
-                    } else if (std.mem.orderZ(u8, @as([*:0]const u8, @ptrCast(&buf)), "p") == .eq) {
+                    } else if (std.mem.orderZ(u8, &buf, "p") == .eq) {
                         if (!loading_image) {
                             loading_image = true;
                             var thread = try std.Thread.spawn(.{}, loadImage, .{ &image, paths.items, window.pipe_fds[1], index, -1 });
