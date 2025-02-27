@@ -105,7 +105,7 @@ fn setNonBlock(fd: std.posix.fd_t) void {
 
 fn onTimer(sigval: c.union_sigval) callconv(.C) void {
     const window = @as(*Window, @ptrCast(@alignCast(sigval.sival_ptr)));
-    window.writeKeypress();
+    window.writeKeypress(window.repeat_keycode);
 }
 
 wl_display: *wl.Display = undefined,
@@ -286,8 +286,8 @@ pub fn shouldClose(self: *Window) bool {
     return !self.running;
 }
 
-pub fn writeKeypress(self: Window) void {
-    const keysym = self.keyboard.getOneSym(self.repeat_keycode);
+pub fn writeKeypress(self: Window, keycode: u32) void {
+    const keysym = self.keyboard.getOneSym(keycode);
     const event = Event{ .keyboard = keysym };
 
     _ = std.posix.write(self.pipe_fds[1], std.mem.asBytes(&event)) catch return;
@@ -296,25 +296,26 @@ pub fn writeKeypress(self: Window) void {
 pub fn dispatchKey(self: *Window, keycode: u32, pressed: bool) void {
     self.keyboard.updateKey(keycode, pressed);
 
-    const its = c.itimerspec{
-        .it_value = c.timespec{
-            .tv_sec = 0,
-            .tv_nsec = @as(u32, @intFromBool(pressed)) * 400 * 1000 * 1000,
-        },
-        .it_interval = c.timespec{
-            .tv_sec = 0,
-            .tv_nsec = @as(u32, @intFromBool(pressed)) * 80 * 1000 * 1000,
-        },
-    };
+    if (self.keyboard.keyRepeats(keycode)) {
+        const its = c.itimerspec{
+            .it_value = c.timespec{
+                .tv_sec = 0,
+                .tv_nsec = @as(u32, @intFromBool(pressed)) * 400 * 1000 * 1000,
+            },
+            .it_interval = c.timespec{
+                .tv_sec = 0,
+                .tv_nsec = @as(u32, @intFromBool(pressed)) * 80 * 1000 * 1000,
+            },
+        };
 
-    if (c.timer_settime(self.timer_id, 0, &its, null) == -1) {
-        unreachable;
+        if (c.timer_settime(self.timer_id, 0, &its, null) == -1) {
+            unreachable;
+        }
+
+        self.repeat_keycode = keycode;
     }
 
-    if (!pressed) {
-        return;
+    if (pressed) {
+        self.writeKeypress(keycode);
     }
-
-    self.repeat_keycode = keycode;
-    self.writeKeypress();
 }

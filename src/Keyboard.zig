@@ -39,3 +39,7 @@ pub fn getName(_: Keyboard, keysym: xkb.xkb_keycode_t, buf: []u8) void {
 pub fn updateKey(self: Keyboard, keycode: xkb.xkb_keycode_t, pressed: bool) void {
     _ = xkb.xkb_state_update_key(self.xkb_state, keycode + keycode_offset, if (pressed) xkb.XKB_KEY_DOWN else xkb.XKB_KEY_UP);
 }
+
+pub fn keyRepeats(self: Keyboard, keycode: xkb.xkb_keycode_t) bool {
+    return xkb.xkb_keymap_key_repeats(self.xkb_keymap, keycode + keycode_offset) == 1;
+}
