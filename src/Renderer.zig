@@ -18,11 +18,15 @@ texture: gl.GLuint,
 texture_width: usize = 0,
 texture_height: usize = 0,
 
-scale: f32 = 1.0,
-fit_screen_scale: f32 = 1.0,
+scale_x: f32 = 1.0,
+scale_y: f32 = 1.0,
 
-translateX: f32 = 0.0,
-translateY: f32 = 0.0,
+scale: f32 = 1.0,
+fit_width: f32 = 1.0,
+fit_both: f32 = 1.0,
+
+translate_x: f32 = 0.0,
+translate_y: f32 = 0.0,
 
 pub fn init() !Renderer {
     const vertices = [_]f32{
@@ -86,37 +90,35 @@ pub fn deinit(self: *Renderer) void {
 pub fn setTexture(self: *Renderer, image: Image) void {
     self.texture_width = image.width;
     self.texture_height = image.height;
+
     gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, @intCast(image.width), @intCast(image.height), 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, @ptrCast(image.data.ptr));
 }
 
 pub fn viewport(self: *Renderer, width: usize, height: usize) void {
-    if (self.texture_width > self.texture_height) {
-        self.fit_screen_scale = @as(f32, @floatFromInt(height)) / @as(f32, @floatFromInt(self.texture_height));
-    } else {
-        self.fit_screen_scale = @as(f32, @floatFromInt(width)) / @as(f32, @floatFromInt(self.texture_width));
-    }
-
-    if (self.texture_width > width or self.texture_height > height) {
-        self.scale = self.fit_screen_scale;
-    }
-
     self.viewport_width = width;
     self.viewport_height = height;
-    gl.glViewport(0, 0, @intCast(width), @intCast(height));
-}
 
-pub fn toggleFitScreen(self: *Renderer) void {
-    if (self.scale != self.fit_screen_scale) {
-        self.scale = self.fit_screen_scale;
+    self.fit_width = @as(f32, @floatFromInt(self.viewport_width)) / @as(f32, @floatFromInt(self.texture_width));
+
+    if (self.viewport_width >= self.texture_width and self.viewport_height >= self.texture_height) {
+        self.fit_both = 1.0;
+    } else if (self.texture_width > self.texture_height) {
+        self.fit_both = @as(f32, @floatFromInt(self.viewport_width)) / @as(f32, @floatFromInt(self.texture_width));
     } else {
-        self.scale = 1.0;
+        self.fit_both = @as(f32, @floatFromInt(self.viewport_height)) / @as(f32, @floatFromInt(self.texture_height));
     }
+
+    self.scale_x = self.scale * (@as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width)));
+    self.scale_y = self.scale * (@as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
+
+    gl.glViewport(0, 0, @intCast(self.viewport_width), @intCast(self.viewport_height));
 }
 
 pub const Zoom = enum {
     in,
     out,
-    fit_screen,
+    fit_width,
+    fit_both,
     reset,
 };
 
@@ -124,9 +126,13 @@ pub fn zoom(self: *Renderer, action: Zoom) void {
     self.scale = switch (action) {
         .in => @max(self.scale * @sqrt(2.0), 1.0 / 1024.0),
         .out => @min(self.scale / @sqrt(2.0), 1024.0),
-        .fit_screen => if (self.scale != self.fit_screen_scale) self.fit_screen_scale else 1.0,
+        .fit_width => self.fit_width,
+        .fit_both => self.fit_both,
         .reset => 1.0,
     };
+
+    self.scale_x = self.scale * (@as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width)));
+    self.scale_y = self.scale * (@as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
 }
 
 pub const Direction = enum {
@@ -134,14 +140,19 @@ pub const Direction = enum {
     right,
     down,
     left,
+    center,
 };
 
 pub fn move(self: *Renderer, direction: Direction) void {
     switch (direction) {
-        .up => self.translateY -= 0.1,
-        .right => self.translateX += 0.1,
-        .down => self.translateY += 0.1,
-        .left => self.translateX -= 0.1,
+        .up => self.translate_y -= 0.1,
+        .right => self.translate_x += 0.1,
+        .down => self.translate_y += 0.1,
+        .left => self.translate_x -= 0.1,
+        .center => {
+            self.translate_y = 0.0;
+            self.translate_x = 0.0;
+        },
     }
 }
 
@@ -153,13 +164,9 @@ pub fn render(self: Renderer) void {
 
     self.shader.use();
 
-    self.shader.setMat4("scale", Mat4.scale(.{
-        self.scale * (@as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width))),
-        self.scale * (@as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height))),
-        0.0,
-    }));
+    self.shader.setMat4("scale", Mat4.scale(.{ self.scale_x, self.scale_y, 0.0 }));
 
-    self.shader.setMat4("translate", Mat4.translate(.{ self.translateX, self.translateY, 0.0 }));
+    self.shader.setMat4("translate", Mat4.translate(.{ self.translate_x, self.translate_y, 0.0 }));
 
     gl.glBindVertexArray(self.vao);
     gl.glDrawElements(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, @ptrFromInt(0));

@@ -74,7 +74,9 @@ pub fn main() !void {
                     } else if (std.mem.orderZ(u8, &buf, "minus") == .eq) {
                         renderer.zoom(.out);
                     } else if (std.mem.orderZ(u8, &buf, "s") == .eq) {
-                        renderer.zoom(.fit_screen);
+                        renderer.zoom(.fit_width);
+                    } else if (std.mem.orderZ(u8, &buf, "w") == .eq) {
+                        renderer.zoom(.fit_both);
                     } else if (std.mem.orderZ(u8, &buf, "o") == .eq) {
                         renderer.zoom(.reset);
                     } else if (std.mem.orderZ(u8, &buf, "k") == .eq) {
@@ -85,6 +87,8 @@ pub fn main() !void {
                         renderer.move(.down);
                     } else if (std.mem.orderZ(u8, &buf, "h") == .eq) {
                         renderer.move(.left);
+                    } else if (std.mem.orderZ(u8, &buf, "m") == .eq) {
+                        renderer.move(.center);
                     } else if (std.mem.orderZ(u8, &buf, "q") == .eq) {
                         window.running = false;
                     } else if (std.mem.orderZ(u8, &buf, "n") == .eq) {
@@ -109,7 +113,6 @@ pub fn main() !void {
                     loading_image = false;
                     index = new_index;
                     renderer.setTexture(image);
-
                     image.deinit();
                 },
             }
