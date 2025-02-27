@@ -33,7 +33,9 @@ fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, window: *Window) 
         .key => |key| {
             window.dispatchKey(key.key, key.state == .pressed);
         },
-        .modifiers => {},
+        .modifiers => |modifiers| {
+            window.keyboard.updateMods(modifiers.mods_depressed, modifiers.mods_latched, modifiers.mods_locked);
+        },
         .repeat_info => |repeat| {
             window.repeat_delay = repeat.delay;
             window.repeat_interval = @divTrunc(1000, repeat.rate);
@@ -296,15 +298,15 @@ pub fn writeKeypress(self: Window, keycode: u32) void {
 pub fn dispatchKey(self: *Window, keycode: u32, pressed: bool) void {
     self.keyboard.updateKey(keycode, pressed);
 
-    if (self.keyboard.keyRepeats(keycode)) {
+    if (!pressed) {
         const its = c.itimerspec{
             .it_value = c.timespec{
                 .tv_sec = 0,
-                .tv_nsec = @as(u32, @intFromBool(pressed)) * 400 * 1000 * 1000,
+                .tv_nsec = 0,
             },
             .it_interval = c.timespec{
                 .tv_sec = 0,
-                .tv_nsec = @as(u32, @intFromBool(pressed)) * 80 * 1000 * 1000,
+                .tv_nsec = 0,
             },
         };
 
@@ -312,10 +314,26 @@ pub fn dispatchKey(self: *Window, keycode: u32, pressed: bool) void {
             unreachable;
         }
 
-        self.repeat_keycode = keycode;
+        return;
     }
 
-    if (pressed) {
-        self.writeKeypress(keycode);
+    self.writeKeypress(keycode);
+
+    if (self.keyboard.keyRepeats(keycode)) {
+        self.repeat_keycode = keycode;
+        const its = c.itimerspec{
+            .it_value = c.timespec{
+                .tv_sec = 0,
+                .tv_nsec = self.repeat_delay * 1000 * 1000,
+            },
+            .it_interval = c.timespec{
+                .tv_sec = 0,
+                .tv_nsec = self.repeat_interval * 1000 * 1000,
+            },
+        };
+
+        if (c.timer_settime(self.timer_id, 0, &its, null) == -1) {
+            unreachable;
+        }
     }
 }
