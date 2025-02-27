@@ -5,6 +5,8 @@ const Image = @import("Image.zig");
 const Event = @import("event.zig").Event;
 const Mat4 = @import("math.zig").Mat4;
 
+const supported_formats = [_][:0]const u8{ ".jpeg", ".jpg", ".png", ".psd" };
+
 pub fn loadImage(image: *Image, paths: [][:0]u8, pipe_fd: std.posix.fd_t, index: usize, step: isize) void {
     const next_index = @as(isize, @intCast(index)) + step;
 
@@ -26,8 +28,11 @@ pub fn main() !void {
         const path = std.mem.span(arg);
         const ext = std.fs.path.extension(path);
 
-        if (std.mem.eql(u8, ext, ".png")) {
-            try paths.append(path);
+        for (supported_formats) |extension| {
+            if (std.mem.eql(u8, ext, extension)) {
+                try paths.append(path);
+                break;
+            }
         }
     }
 
