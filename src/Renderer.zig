@@ -5,6 +5,8 @@ const Shader = @import("Shader.zig");
 const Image = @import("Image.zig");
 const Mat4 = @import("math.zig").Mat4;
 
+pub const Fit = enum { width, both, none };
+
 shader: Shader,
 
 vao: gl.GLuint,
@@ -17,6 +19,8 @@ viewport_height: f32 = 0,
 texture: gl.GLuint,
 texture_width: f32 = 0,
 texture_height: f32 = 0,
+
+fit_state: Fit = .both,
 
 scale_x: f32 = 1.0,
 scale_y: f32 = 1.0,
@@ -87,19 +91,55 @@ pub fn deinit(self: *Renderer) void {
     gl.glDeleteBuffers(1, &self.ebo);
 }
 
+pub fn resetScaleAndTranslate(self: *Renderer) void {
+    self.scale = 1.0;
+    self.fit_state = .none;
+
+    if (self.texture_width > self.viewport_width) {
+        self.translate_x = -1.0 + (self.texture_width / self.viewport_width);
+    } else {
+        self.translate_x = 0.0;
+    }
+
+    if (self.texture_height > self.viewport_height) {
+        self.translate_y = 1.0 - (self.texture_height / self.viewport_height);
+    } else {
+        self.translate_y = 0.0;
+    }
+}
+
+pub fn fit(self: *Renderer, action: Fit) void {
+    self.fit_state = action;
+
+    switch (action) {
+        .width => {
+            self.translate_y = 1.0 - (self.fit_width * self.texture_height / self.viewport_height);
+            self.translate_x = 0.0;
+            self.scale = self.fit_width;
+        },
+        .both => {
+            self.translate_y = 0.0;
+            self.translate_x = 0.0;
+            self.scale = self.fit_both;
+        },
+        .none => {
+            if (self.scale == self.fit_both or self.scale == self.fit_width) {
+                self.resetScaleAndTranslate();
+            }
+        },
+    }
+
+    self.scale_x = self.scale * (self.texture_width / self.viewport_width);
+    self.scale_y = self.scale * (self.texture_height / self.viewport_height);
+}
+
 pub fn setTexture(self: *Renderer, image: Image) void {
     self.texture_width = @floatFromInt(image.width);
     self.texture_height = @floatFromInt(image.height);
 
-    if (self.viewport_height > 0 and self.texture_height > self.viewport_height) {
-        if (self.texture_height > self.viewport_height) {
-            self.translate_y = 1.0 - (self.scale * self.texture_height / self.viewport_height);
-        }
-
-        if (self.texture_width > self.viewport_width) {
-            self.translate_x = -1.0 + (self.scale * self.texture_width / self.viewport_width);
-        }
-    }
+    self.fit_width = self.viewport_width / self.texture_width;
+    self.fit_both = @min(self.fit_width, self.viewport_height / self.texture_height);
+    self.fit(self.fit_state);
 
     gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, @intCast(image.width), @intCast(image.height), 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, @ptrCast(image.data.ptr));
 }
@@ -109,58 +149,24 @@ pub fn viewport(self: *Renderer, width: usize, height: usize) void {
     self.viewport_height = @floatFromInt(height);
 
     self.fit_width = self.viewport_width / self.texture_width;
-
-    if (self.viewport_width >= self.texture_width and self.viewport_height >= self.texture_height) {
-        self.fit_both = 1.0;
-    } else if (self.texture_width > self.texture_height) {
-        self.fit_both = self.viewport_width / self.texture_width;
-    } else {
-        self.fit_both = self.viewport_height / self.texture_height;
-    }
-
-    self.scale_x = self.scale * self.texture_width / self.viewport_width;
-    self.scale_y = self.scale * self.texture_height / self.viewport_height;
-
-    if (self.translate_y == 0.0 and self.translate_x == 0.0) {
-        if (self.texture_height > self.viewport_height) {
-            self.translate_y = 1.0 - (self.scale * self.texture_height / self.viewport_height);
-        }
-
-        if (self.texture_width > self.viewport_width) {
-            self.translate_x = -1.0 + (self.scale * self.texture_width / self.viewport_width);
-        }
-    }
+    self.fit_both = @min(self.fit_width, self.viewport_height / self.texture_height);
+    self.fit(self.fit_state);
 
     gl.glViewport(0, 0, @intFromFloat(self.viewport_width), @intFromFloat(self.viewport_height));
 }
 
-pub const Zoom = enum {
-    in,
-    out,
-    fit_width,
-    fit_both,
-    reset,
-};
+pub const Zoom = enum { in, out, none };
 
 pub fn zoom(self: *Renderer, action: Zoom) void {
-    self.scale = switch (action) {
-        .in => @max(self.scale * @sqrt(2.0), 1.0 / 1024.0),
-        .out => @min(self.scale / @sqrt(2.0), 1024.0),
-        .fit_width => scale: {
-            self.translate_y = 1.0 - (self.fit_width * self.texture_height / self.viewport_height);
-            self.translate_x = 0.0;
-            break :scale self.fit_width;
-        },
-        .fit_both => scale: {
-            self.translate_y = 0.0;
-            self.translate_x = 0.0;
-            break :scale self.fit_both;
-        },
-        .reset => 1.0,
-    };
+    self.fit_state = .none;
+    switch (action) {
+        .in => self.scale = @max(self.scale * @sqrt(2.0), 1.0 / 1024.0),
+        .out => self.scale = @min(self.scale / @sqrt(2.0), 1024.0),
+        .none => self.resetScaleAndTranslate(),
+    }
 
-    self.scale_x = self.scale * self.texture_width / self.viewport_width;
-    self.scale_y = self.scale * self.texture_height / self.viewport_height;
+    self.scale_x = self.scale * (self.texture_width / self.viewport_width);
+    self.scale_y = self.scale * (self.texture_height / self.viewport_height);
 }
 
 pub const Direction = enum {

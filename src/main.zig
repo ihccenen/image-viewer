@@ -74,11 +74,11 @@ pub fn main() !void {
                     } else if (std.mem.orderZ(u8, &buf, "minus") == .eq) {
                         renderer.zoom(.out);
                     } else if (std.mem.orderZ(u8, &buf, "s") == .eq) {
-                        renderer.zoom(.fit_width);
+                        renderer.fit(.width);
                     } else if (std.mem.orderZ(u8, &buf, "w") == .eq) {
-                        renderer.zoom(.fit_both);
+                        renderer.fit(.both);
                     } else if (std.mem.orderZ(u8, &buf, "o") == .eq) {
-                        renderer.zoom(.reset);
+                        renderer.zoom(.none);
                     } else if (std.mem.orderZ(u8, &buf, "k") == .eq) {
                         renderer.move(.up);
                     } else if (std.mem.orderZ(u8, &buf, "l") == .eq) {
