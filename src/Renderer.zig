@@ -91,6 +91,16 @@ pub fn setTexture(self: *Renderer, image: Image) void {
     self.texture_width = image.width;
     self.texture_height = image.height;
 
+    if (self.viewport_height > 0 and self.texture_height > self.viewport_height) {
+        if (self.texture_height > self.viewport_height) {
+            self.translate_y = 1.0 - (self.scale * @as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
+        }
+
+        if (self.texture_width > self.viewport_width) {
+            self.translate_x = -1.0 + (self.scale * @as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width)));
+        }
+    }
+
     gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, @intCast(image.width), @intCast(image.height), 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, @ptrCast(image.data.ptr));
 }
 
@@ -111,6 +121,16 @@ pub fn viewport(self: *Renderer, width: usize, height: usize) void {
     self.scale_x = self.scale * (@as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width)));
     self.scale_y = self.scale * (@as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
 
+    if (self.translate_y == 0.0 and self.translate_x == 0.0) {
+        if (self.texture_height > self.viewport_height) {
+            self.translate_y = 1.0 - (self.scale * @as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
+        }
+
+        if (self.texture_width > self.viewport_width) {
+            self.translate_x = -1.0 + (self.scale * @as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width)));
+        }
+    }
+
     gl.glViewport(0, 0, @intCast(self.viewport_width), @intCast(self.viewport_height));
 }
 
@@ -126,8 +146,16 @@ pub fn zoom(self: *Renderer, action: Zoom) void {
     self.scale = switch (action) {
         .in => @max(self.scale * @sqrt(2.0), 1.0 / 1024.0),
         .out => @min(self.scale / @sqrt(2.0), 1024.0),
-        .fit_width => self.fit_width,
-        .fit_both => self.fit_both,
+        .fit_width => scale: {
+            self.translate_y = 1.0 - (self.fit_width * @as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
+            self.translate_x = 0.0;
+            break :scale self.fit_width;
+        },
+        .fit_both => scale: {
+            self.translate_y = 0.0;
+            self.translate_x = 0.0;
+            break :scale self.fit_both;
+        },
         .reset => 1.0,
     };
 
