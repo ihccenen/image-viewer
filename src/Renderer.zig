@@ -11,12 +11,12 @@ vao: gl.GLuint,
 vbo: gl.GLuint,
 ebo: gl.GLuint,
 
-viewport_width: usize = 0,
-viewport_height: usize = 0,
+viewport_width: f32 = 0,
+viewport_height: f32 = 0,
 
 texture: gl.GLuint,
-texture_width: usize = 0,
-texture_height: usize = 0,
+texture_width: f32 = 0,
+texture_height: f32 = 0,
 
 scale_x: f32 = 1.0,
 scale_y: f32 = 1.0,
@@ -88,16 +88,16 @@ pub fn deinit(self: *Renderer) void {
 }
 
 pub fn setTexture(self: *Renderer, image: Image) void {
-    self.texture_width = image.width;
-    self.texture_height = image.height;
+    self.texture_width = @floatFromInt(image.width);
+    self.texture_height = @floatFromInt(image.height);
 
     if (self.viewport_height > 0 and self.texture_height > self.viewport_height) {
         if (self.texture_height > self.viewport_height) {
-            self.translate_y = 1.0 - (self.scale * @as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
+            self.translate_y = 1.0 - (self.scale * self.texture_height / self.viewport_height);
         }
 
         if (self.texture_width > self.viewport_width) {
-            self.translate_x = -1.0 + (self.scale * @as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width)));
+            self.translate_x = -1.0 + (self.scale * self.texture_width / self.viewport_width);
         }
     }
 
@@ -105,33 +105,33 @@ pub fn setTexture(self: *Renderer, image: Image) void {
 }
 
 pub fn viewport(self: *Renderer, width: usize, height: usize) void {
-    self.viewport_width = width;
-    self.viewport_height = height;
+    self.viewport_width = @floatFromInt(width);
+    self.viewport_height = @floatFromInt(height);
 
-    self.fit_width = @as(f32, @floatFromInt(self.viewport_width)) / @as(f32, @floatFromInt(self.texture_width));
+    self.fit_width = self.viewport_width / self.texture_width;
 
     if (self.viewport_width >= self.texture_width and self.viewport_height >= self.texture_height) {
         self.fit_both = 1.0;
     } else if (self.texture_width > self.texture_height) {
-        self.fit_both = @as(f32, @floatFromInt(self.viewport_width)) / @as(f32, @floatFromInt(self.texture_width));
+        self.fit_both = self.viewport_width / self.texture_width;
     } else {
-        self.fit_both = @as(f32, @floatFromInt(self.viewport_height)) / @as(f32, @floatFromInt(self.texture_height));
+        self.fit_both = self.viewport_height / self.texture_height;
     }
 
-    self.scale_x = self.scale * (@as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width)));
-    self.scale_y = self.scale * (@as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
+    self.scale_x = self.scale * self.texture_width / self.viewport_width;
+    self.scale_y = self.scale * self.texture_height / self.viewport_height;
 
     if (self.translate_y == 0.0 and self.translate_x == 0.0) {
         if (self.texture_height > self.viewport_height) {
-            self.translate_y = 1.0 - (self.scale * @as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
+            self.translate_y = 1.0 - (self.scale * self.texture_height / self.viewport_height);
         }
 
         if (self.texture_width > self.viewport_width) {
-            self.translate_x = -1.0 + (self.scale * @as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width)));
+            self.translate_x = -1.0 + (self.scale * self.texture_width / self.viewport_width);
         }
     }
 
-    gl.glViewport(0, 0, @intCast(self.viewport_width), @intCast(self.viewport_height));
+    gl.glViewport(0, 0, @intFromFloat(self.viewport_width), @intFromFloat(self.viewport_height));
 }
 
 pub const Zoom = enum {
@@ -147,7 +147,7 @@ pub fn zoom(self: *Renderer, action: Zoom) void {
         .in => @max(self.scale * @sqrt(2.0), 1.0 / 1024.0),
         .out => @min(self.scale / @sqrt(2.0), 1024.0),
         .fit_width => scale: {
-            self.translate_y = 1.0 - (self.fit_width * @as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
+            self.translate_y = 1.0 - (self.fit_width * self.texture_height / self.viewport_height);
             self.translate_x = 0.0;
             break :scale self.fit_width;
         },
@@ -159,8 +159,8 @@ pub fn zoom(self: *Renderer, action: Zoom) void {
         .reset => 1.0,
     };
 
-    self.scale_x = self.scale * (@as(f32, @floatFromInt(self.texture_width)) / @as(f32, @floatFromInt(self.viewport_width)));
-    self.scale_y = self.scale * (@as(f32, @floatFromInt(self.texture_height)) / @as(f32, @floatFromInt(self.viewport_height)));
+    self.scale_x = self.scale * self.texture_width / self.viewport_width;
+    self.scale_y = self.scale * self.texture_height / self.viewport_height;
 }
 
 pub const Direction = enum {
