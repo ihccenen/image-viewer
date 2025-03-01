@@ -58,16 +58,25 @@ fn seatListener(_: *wl.Seat, event: wl.Seat.Event, window: *Window) void {
     }
 }
 
+fn wmBaseListener(_: *xdg.WmBase, event: xdg.WmBase.Event, window: *Window) void {
+    switch (event) {
+        .ping => |ping| {
+            window.wm_base.pong(ping.serial);
+        },
+    }
+}
+
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, window: *Window) void {
     switch (event) {
         .global => |global| {
             if (mem.orderZ(u8, global.interface, wl.Compositor.interface.name) == .eq) {
                 window.wl_compositor = registry.bind(global.name, wl.Compositor, 1) catch return;
             } else if (mem.orderZ(u8, global.interface, wl.Seat.interface.name) == .eq) {
-                window.wl_seat = registry.bind(global.name, wl.Seat, 1) catch return;
+                window.wl_seat = registry.bind(global.name, wl.Seat, 9) catch return;
                 window.wl_seat.setListener(*Window, seatListener, window);
             } else if (mem.orderZ(u8, global.interface, xdg.WmBase.interface.name) == .eq) {
                 window.wm_base = registry.bind(global.name, xdg.WmBase, 1) catch return;
+                window.wm_base.setListener(*Window, wmBaseListener, window);
             }
         },
         .global_remove => {},
