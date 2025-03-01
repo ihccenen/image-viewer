@@ -94,7 +94,7 @@ fn xdgSurfaceListener(xdg_surface: *xdg.Surface, event: xdg.Surface.Event, _: *w
 fn xdgToplevelListener(_: *xdg.Toplevel, event: xdg.Toplevel.Event, window: *Window) void {
     switch (event) {
         .configure => |configure| {
-            if (configure.width > 0 and configure.height > 0) {
+            if (window.width != configure.width and window.height != configure.height) {
                 window.width = @intCast(configure.width);
                 window.height = @intCast(configure.height);
                 wl.EglWindow.resize(window.egl_window, @intCast(window.width), @intCast(window.height), 0, 0);

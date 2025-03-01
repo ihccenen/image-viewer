@@ -122,11 +122,7 @@ pub fn fit(self: *Renderer, action: Fit) void {
             self.translate_x = 0.0;
             self.scale = self.fit_both;
         },
-        .none => {
-            if (self.scale == self.fit_both or self.scale == self.fit_width) {
-                self.resetScaleAndTranslate();
-            }
-        },
+        .none => self.resetScaleAndTranslate(),
     }
 
     self.scale_x = self.scale * (self.texture_width / self.viewport_width);

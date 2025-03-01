@@ -10,8 +10,6 @@ const supported_formats = [_][:0]const u8{ ".jpeg", ".jpg", ".png", ".psd" };
 pub fn loadImage(image: *Image, paths: [][:0]u8, pipe_fd: std.posix.fd_t, index: usize, step: isize) void {
     const next_index = @as(isize, @intCast(index)) + step;
 
-    if (next_index >= paths.len or next_index < 0) return;
-
     image.* = Image.init(paths[@intCast(next_index)]) catch return;
 
     const event = Event{ .image_loaded = @intCast(next_index) };
@@ -92,13 +90,13 @@ pub fn main() !void {
                     } else if (std.mem.orderZ(u8, &buf, "q") == .eq) {
                         window.running = false;
                     } else if (std.mem.orderZ(u8, &buf, "n") == .eq) {
-                        if (!loading_image) {
+                        if (index + 1 < paths.items.len and !loading_image) {
                             loading_image = true;
                             var thread = try std.Thread.spawn(.{}, loadImage, .{ &image, paths.items, window.pipe_fds[1], index, 1 });
                             thread.detach();
                         }
                     } else if (std.mem.orderZ(u8, &buf, "p") == .eq) {
-                        if (!loading_image) {
+                        if (index > 0 and !loading_image) {
                             loading_image = true;
                             var thread = try std.Thread.spawn(.{}, loadImage, .{ &image, paths.items, window.pipe_fds[1], index, -1 });
                             thread.detach();
