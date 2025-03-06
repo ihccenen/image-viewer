@@ -32,6 +32,8 @@ fit_both: f32 = 1.0,
 translate_x: f32 = 0.0,
 translate_y: f32 = 0.0,
 
+need_redraw: bool = false,
+
 pub fn init() !Renderer {
     const vertices = [_]f32{
         1.0, 1.0, 0.0, 1.0, 1.0, // top right
@@ -106,6 +108,8 @@ pub fn resetScaleAndTranslate(self: *Renderer) void {
     } else {
         self.translate_y = 0.0;
     }
+
+    self.need_redraw = true;
 }
 
 pub fn fit(self: *Renderer, action: Fit) void {
@@ -127,6 +131,8 @@ pub fn fit(self: *Renderer, action: Fit) void {
 
     self.scale_x = self.scale * (self.texture_width / self.viewport_width);
     self.scale_y = self.scale * (self.texture_height / self.viewport_height);
+
+    self.need_redraw = true;
 }
 
 pub fn setTexture(self: *Renderer, image: Image) void {
@@ -138,6 +144,8 @@ pub fn setTexture(self: *Renderer, image: Image) void {
     self.fit(self.fit_state);
 
     gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, @intCast(image.width), @intCast(image.height), 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, @ptrCast(image.data.ptr));
+
+    self.need_redraw = true;
 }
 
 pub fn viewport(self: *Renderer, width: usize, height: usize) void {
@@ -149,12 +157,15 @@ pub fn viewport(self: *Renderer, width: usize, height: usize) void {
     self.fit(self.fit_state);
 
     gl.glViewport(0, 0, @intFromFloat(self.viewport_width), @intFromFloat(self.viewport_height));
+
+    self.need_redraw = true;
 }
 
 pub const Zoom = enum { in, out, none };
 
 pub fn zoom(self: *Renderer, action: Zoom) void {
     self.fit_state = .none;
+
     switch (action) {
         .in => self.scale = @max(self.scale * @sqrt(2.0), 1.0 / 1024.0),
         .out => self.scale = @min(self.scale / @sqrt(2.0), 1024.0),
@@ -163,6 +174,8 @@ pub fn zoom(self: *Renderer, action: Zoom) void {
 
     self.scale_x = self.scale * (self.texture_width / self.viewport_width);
     self.scale_y = self.scale * (self.texture_height / self.viewport_height);
+
+    self.need_redraw = true;
 }
 
 pub const Direction = enum {
@@ -184,9 +197,11 @@ pub fn move(self: *Renderer, direction: Direction) void {
             self.translate_x = 0.0;
         },
     }
+
+    self.need_redraw = true;
 }
 
-pub fn render(self: Renderer) void {
+pub fn render(self: *Renderer) void {
     gl.glClearColor(0.0, 0.0, 0.0, 1.0);
     gl.glClear(gl.GL_COLOR_BUFFER_BIT);
 
@@ -200,4 +215,6 @@ pub fn render(self: Renderer) void {
 
     gl.glBindVertexArray(self.vao);
     gl.glDrawElements(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, @ptrFromInt(0));
+
+    self.need_redraw = false;
 }
