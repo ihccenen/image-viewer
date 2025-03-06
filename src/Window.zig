@@ -83,10 +83,11 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, window: *W
     }
 }
 
-fn xdgSurfaceListener(xdg_surface: *xdg.Surface, event: xdg.Surface.Event, _: *wl.Surface) void {
+fn xdgSurfaceListener(xdg_surface: *xdg.Surface, event: xdg.Surface.Event, window: *Window) void {
     switch (event) {
         .configure => |configure| {
             xdg_surface.ackConfigure(configure.serial);
+            window.xdg_configured = true;
         },
     }
 }
@@ -116,6 +117,7 @@ fn setNonBlock(fd: std.posix.fd_t) void {
 
 fn onTimer(sigval: c.union_sigval) callconv(.C) void {
     const window = @as(*Window, @ptrCast(@alignCast(sigval.sival_ptr)));
+
     window.writeKeypress(window.repeat_keycode);
 }
 
@@ -129,6 +131,7 @@ wl_keyboard: *wl.Keyboard = undefined,
 wm_base: *xdg.WmBase = undefined,
 xdg_surface: *xdg.Surface = undefined,
 xdg_toplevel: *xdg.Toplevel = undefined,
+xdg_configured: bool = false,
 
 egl_display: c.EGLDisplay = undefined,
 egl_context: c.EGLContext = undefined,
@@ -143,14 +146,17 @@ repeat_keycode: u32 = undefined,
 repeat_delay: i32 = 400,
 repeat_interval: i32 = 80,
 
-running: bool = false,
-
+wl_display_fd: std.posix.fd_t = undefined,
 pipe_fds: [2]std.posix.fd_t = undefined,
 timer_id: c.timer_t = undefined,
+
+running: bool = false,
 
 pub fn init(self: *Window, width: usize, height: usize) !void {
     self.wl_display = try wl.Display.connect(null);
     self.wl_registry = try self.wl_display.getRegistry();
+
+    self.wl_display_fd = self.wl_display.getFd();
 
     self.wl_registry.setListener(*Window, registryListener, self);
     if (self.wl_display.roundtrip() != .SUCCESS) return error.RoundtripFailed;
@@ -159,7 +165,7 @@ pub fn init(self: *Window, width: usize, height: usize) !void {
     self.xdg_surface = try self.wm_base.getXdgSurface(self.wl_surface);
     self.xdg_toplevel = try self.xdg_surface.getToplevel();
 
-    self.xdg_surface.setListener(*wl.Surface, xdgSurfaceListener, self.wl_surface);
+    self.xdg_surface.setListener(*Window, xdgSurfaceListener, self);
     self.xdg_toplevel.setTitle("image viewer");
     self.xdg_toplevel.setListener(*Window, xdgToplevelListener, self);
 
@@ -279,17 +285,15 @@ pub fn deinit(self: *Window) void {
 }
 
 pub fn swapBuffers(self: *Window) !void {
-    if (c.eglSwapBuffers(self.egl_display, self.egl_surface) != c.EGL_TRUE) {
-        switch (c.eglGetError()) {
-            c.EGL_BAD_DISPLAY => return error.InvalidDisplay,
-            c.EGL_BAD_SURFACE => return error.PresentInvalidSurface,
-            c.EGL_CONTEXT_LOST => return error.EGLContextLost,
-            else => return error.FailedToSwapBuffers,
+    if (self.xdg_configured) {
+        if (c.eglSwapBuffers(self.egl_display, self.egl_surface) != c.EGL_TRUE) {
+            switch (c.eglGetError()) {
+                c.EGL_BAD_DISPLAY => return error.InvalidDisplay,
+                c.EGL_BAD_SURFACE => return error.PresentInvalidSurface,
+                c.EGL_CONTEXT_LOST => return error.EGLContextLost,
+                else => return error.FailedToSwapBuffers,
+            }
         }
-    }
-
-    if (self.wl_display.dispatch() != .SUCCESS) {
-        return error.dispatchFailed;
     }
 }
 
