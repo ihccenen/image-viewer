@@ -101,9 +101,9 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
     } else if (std.mem.orderZ(u8, &buf, "minus") == .eq) {
         self.renderer.zoom(.out);
     } else if (std.mem.orderZ(u8, &buf, "s") == .eq) {
-        self.renderer.fit(.width);
+        self.renderer.setFit(.width);
     } else if (std.mem.orderZ(u8, &buf, "w") == .eq) {
-        self.renderer.fit(.both);
+        self.renderer.setFit(.both);
     } else if (std.mem.orderZ(u8, &buf, "o") == .eq) {
         self.renderer.zoom(.none);
     } else if (std.mem.orderZ(u8, &buf, "k") == .eq) {
@@ -140,7 +140,7 @@ fn readEvents(self: *App) !void {
             .keyboard => |keysym| try self.keyboardHandler(keysym),
             .resize => |dim| {
                 const width, const height = dim;
-                self.renderer.viewport(width, height);
+                self.renderer.setViewport(width, height);
             },
             .image_loaded => |new_index| {
                 self.loading_image = false;
