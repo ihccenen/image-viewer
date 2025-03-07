@@ -152,7 +152,7 @@ timer_id: c.timer_t = undefined,
 
 running: bool = false,
 
-pub fn init(self: *Window, width: usize, height: usize) !void {
+pub fn init(self: *Window, width: usize, height: usize, title: [:0]u8) !void {
     self.wl_display = try wl.Display.connect(null);
     self.wl_registry = try self.wl_display.getRegistry();
 
@@ -166,7 +166,7 @@ pub fn init(self: *Window, width: usize, height: usize) !void {
     self.xdg_toplevel = try self.xdg_surface.getToplevel();
 
     self.xdg_surface.setListener(*Window, xdgSurfaceListener, self);
-    self.xdg_toplevel.setTitle("image viewer");
+    self.xdg_toplevel.setTitle(title);
     self.xdg_toplevel.setListener(*Window, xdgToplevelListener, self);
 
     self.egl_display = c.eglGetPlatformDisplay(c.EGL_PLATFORM_WAYLAND_KHR, self.wl_display, null);
@@ -282,6 +282,10 @@ pub fn deinit(self: *Window) void {
     _ = c.eglTerminate(self.egl_display);
     _ = c.eglDestroyContext(self.egl_display, self.egl_context);
     self.egl_window.destroy();
+}
+
+pub fn setTitle(self: Window, title: [:0]u8) void {
+    self.xdg_toplevel.setTitle(title);
 }
 
 pub fn swapBuffers(self: *Window) !void {

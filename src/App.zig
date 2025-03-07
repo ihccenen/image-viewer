@@ -24,7 +24,10 @@ allocator: Allocator,
 
 pub fn init(allocator: Allocator, paths: [][:0]u8) !App {
     var window = try allocator.create(Window);
-    try window.init(1, 1);
+    const basename = std.fs.path.basename(paths[0]);
+    const filename = try std.fmt.allocPrintZ(allocator, "{d} of {d} - {s}", .{ 1, paths.len, basename });
+    defer allocator.free(filename);
+    try window.init(1, 1, filename);
 
     var renderer = try allocator.create(Renderer);
     renderer.* = try Renderer.init();
@@ -147,6 +150,12 @@ fn readEvents(self: *App) !void {
                 self.index = new_index;
                 self.renderer.setTexture(self.image);
                 self.image.deinit();
+
+                const basename = std.fs.path.basename(self.paths[self.index]);
+                const filename = try std.fmt.allocPrintZ(self.allocator, "{d} of {d} - {s}", .{ self.index + 1, self.paths.len, basename });
+                defer self.allocator.free(filename);
+
+                self.window.setTitle(filename);
             },
         }
     }
