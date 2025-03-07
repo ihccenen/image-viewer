@@ -1,7 +1,5 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const Window = @import("Window.zig");
-const Renderer = @import("Renderer.zig");
 const App = @import("App.zig");
 
 const supported_formats = [_][:0]const u8{ ".jpeg", ".jpg", ".png", ".psd" };
