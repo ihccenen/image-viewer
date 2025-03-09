@@ -18,34 +18,34 @@ vbo: gl.GLuint,
 ebo: gl.GLuint,
 
 viewport: struct {
-    width: f32 = 0,
-    height: f32 = 0,
-} = .{},
+    width: f32,
+    height: f32,
+},
 
 texture: struct {
-    id: gl.GLuint = 0,
-    width: f32 = 0,
-    height: f32 = 0,
-} = .{},
+    id: gl.GLuint,
+    width: f32,
+    height: f32,
+},
 
 scale: struct {
-    factor: f32 = 1,
-    width: f32 = 1,
-    height: f32 = 1,
-} = .{},
+    factor: f32,
+    width: f32,
+    height: f32,
+},
 
 fit: struct {
-    state: Fit = .both,
-    width: f32 = 1,
-    both: f32 = 1,
-} = .{},
+    state: Fit,
+    width: f32,
+    both: f32,
+},
 
 translate: struct {
-    x: f32 = 0,
-    y: f32 = 0,
-    max_x: f32 = 0,
-    max_y: f32 = 0,
-} = .{},
+    max_x: f32,
+    x: f32,
+    max_y: f32,
+    y: f32,
+},
 
 need_redraw: bool = false,
 
@@ -97,7 +97,12 @@ pub fn init() !Renderer {
         .vao = vao,
         .vbo = vbo,
         .ebo = ebo,
-        .texture = .{ .id = texture },
+        .viewport = .{ .width = 0, .height = 0 },
+        .texture = .{ .id = texture, .width = 0, .height = 0 },
+        .scale = .{ .factor = 1, .width = 1, .height = 1 },
+        .fit = .{ .state = .both, .width = 1, .both = 1 },
+        .translate = .{ .max_x = 0, .x = 0, .max_y = 0, .y = 0 },
+        .need_redraw = false,
     };
 }
 
