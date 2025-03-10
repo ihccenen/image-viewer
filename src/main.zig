@@ -9,10 +9,8 @@ fn lessThan(_: void, lhs: [:0]u8, rhs: [:0]u8) bool {
 }
 
 fn isSupported(path: [:0]u8) bool {
-    const ext = std.fs.path.extension(path);
-
     for (supported_formats) |extension| {
-        if (std.mem.eql(u8, ext, extension)) return true;
+        if (std.ascii.endsWithIgnoreCase(path, extension)) return true;
     }
 
     return false;
