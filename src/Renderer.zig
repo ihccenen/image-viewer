@@ -85,15 +85,18 @@ pub fn init() !Renderer {
 
     var texture: gl.GLuint = 0;
     gl.glGenTextures(1, &texture);
-    gl.glBindTexture(gl.GL_TEXTURE_2D, texture);
+    gl.glBindTexture(gl.GL_TEXTURE_2D_ARRAY, texture);
 
-    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR);
-    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR);
-    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT);
-    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_REPEAT);
+    gl.glTexParameteri(gl.GL_TEXTURE_2D_ARRAY, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR);
+    gl.glTexParameteri(gl.GL_TEXTURE_2D_ARRAY, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR);
+    gl.glTexParameteri(gl.GL_TEXTURE_2D_ARRAY, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE);
+    gl.glTexParameteri(gl.GL_TEXTURE_2D_ARRAY, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE);
+
+    const shader = try Shader.init();
+    shader.setInt("textures", 0);
 
     return .{
-        .shader = try Shader.init(),
+        .shader = shader,
         .vao = vao,
         .vbo = vbo,
         .ebo = ebo,
@@ -168,7 +171,33 @@ pub fn setTexture(self: *Renderer, image: Image) void {
     self.translate.max_x = (self.scale.factor * self.texture.width) / self.viewport.width;
     self.translate.max_y = (self.scale.factor * self.texture.height) / self.viewport.height;
 
-    gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA, @intCast(image.width), @intCast(image.height), 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, @ptrCast(image.data.ptr));
+    const width = image.width / 2;
+    const height = image.height / 2;
+    const layer_count = 4;
+
+    gl.glPixelStorei(gl.GL_UNPACK_ROW_LENGTH, @intCast(image.width));
+    gl.glPixelStorei(gl.GL_UNPACK_IMAGE_HEIGHT, @intCast(image.height));
+    gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1);
+
+    gl.glTexImage3D(gl.GL_TEXTURE_2D_ARRAY, 0, gl.GL_RGBA8, @intCast(width), @intCast(height), layer_count, 0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, null);
+
+    for (0..2) |x| {
+        for (0..2) |y| {
+            gl.glTexSubImage3D(
+                gl.GL_TEXTURE_2D_ARRAY,
+                0,
+                0,
+                0,
+                @intCast(x * 2 + y),
+                @intCast(width),
+                @intCast(height),
+                1,
+                gl.GL_RGBA,
+                gl.GL_UNSIGNED_BYTE,
+                @ptrCast(image.data.ptr + (x * height * @as(usize, @intCast(image.width)) + y * width) * 4),
+            );
+        }
+    }
 
     self.need_redraw = true;
 }
@@ -268,14 +297,10 @@ pub fn render(self: *Renderer) void {
     gl.glClearColor(0.0, 0.0, 0.0, 1.0);
     gl.glClear(gl.GL_COLOR_BUFFER_BIT);
 
-    gl.glBindTexture(gl.GL_TEXTURE_2D, self.texture.id);
-
+    gl.glBindTexture(gl.GL_TEXTURE_2D_ARRAY, self.texture.id);
     self.shader.use();
-
     self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
-
     self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
-
     gl.glBindVertexArray(self.vao);
     gl.glDrawElements(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, @ptrFromInt(0));
 

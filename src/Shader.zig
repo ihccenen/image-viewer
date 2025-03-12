@@ -22,14 +22,24 @@ const vertex =
 
 const fragment =
     \\ #version 330 core
-    \\ out vec4 FragColor;
     \\ in vec2 TexCoord;
+    \\ out vec4 FragColor;
     \\
-    \\ uniform sampler2D texture1;
+    \\ uniform sampler2DArray textures;
     \\
     \\ void main()
     \\ {
-    \\     FragColor = texture(texture1, TexCoord);
+    \\    float layerWidth = 1.0 / 2.0;
+    \\    float layerHeight = 1.0 / 2.0;
+    \\
+    \\    int layerX = int(TexCoord.x / layerWidth);
+    \\    int layerY = int(TexCoord.y / layerHeight);
+    \\    int layer = layerY * 2 + layerX;
+    \\
+    \\    float adjustedX = (TexCoord.x - float(layerX) * layerWidth) / layerWidth;
+    \\    float adjustedY = (TexCoord.y - float(layerY) * layerHeight) / layerHeight;
+    \\
+    \\    FragColor = texture(textures, vec3(adjustedX, adjustedY, layer));
     \\ }
 ;
 
@@ -86,6 +96,10 @@ pub fn deinit(self: Shader) void {
 
 pub fn use(self: Shader) void {
     gl.glUseProgram(self.id);
+}
+
+pub fn setInt(self: Shader, name: [:0]const u8, val: usize) void {
+    gl.glUniform1i(gl.glGetUniformLocation(self.id, name), @intCast(val));
 }
 
 pub fn setMat4(self: Shader, name: [:0]const u8, mat: Mat4) void {
