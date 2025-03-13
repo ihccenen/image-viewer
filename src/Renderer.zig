@@ -263,25 +263,26 @@ pub const Direction = enum {
 };
 
 pub fn move(self: *Renderer, direction: Direction) void {
+    const step = self.scale.factor * 0.1;
     switch (direction) {
         .up => {
             if (self.scale.factor * self.texture.height > self.viewport.height) {
-                self.translate.y = @max(self.translate.y - 0.1, 1 - self.translate.max_y);
+                self.translate.y = @max(self.translate.y - step, 1 - self.translate.max_y);
             }
         },
         .right => {
             if (self.scale.factor * self.texture.width > self.viewport.width) {
-                self.translate.x = @max(self.translate.x - 0.1, 1 - self.translate.max_x);
+                self.translate.x = @max(self.translate.x - step, 1 - self.translate.max_x);
             }
         },
         .down => {
             if (self.scale.factor * self.texture.height > self.viewport.height) {
-                self.translate.y = @min(self.translate.y + 0.1, -1 + self.translate.max_y);
+                self.translate.y = @min(self.translate.y + step, -1 + self.translate.max_y);
             }
         },
         .left => {
             if (self.scale.factor * self.texture.width > self.viewport.width) {
-                self.translate.x = @min(self.translate.x + 0.1, -1 + self.translate.max_x);
+                self.translate.x = @min(self.translate.x + step, -1 + self.translate.max_x);
             }
         },
         .center => {
