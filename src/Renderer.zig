@@ -144,7 +144,7 @@ pub fn setFit(self: *Renderer, state: Fit) void {
             self.scale.factor = self.fit.width;
             self.translate.max_x = (self.scale.factor * self.texture.width) / self.viewport.width;
             self.translate.max_y = (self.scale.factor * self.texture.height) / self.viewport.height;
-            self.translate.y = 1.0 - self.translate.max_y;
+            self.translate.y = if (self.viewport.height > self.scale.factor * self.texture.height) 0.0 else 1.0 - self.translate.max_y;
         },
         .both => {
             self.translate.x = 0.0;
