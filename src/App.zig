@@ -128,6 +128,14 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
     }
 }
 
+fn pointerPressedHandler(self: *App, button: u32) !void {
+    switch (button) {
+        275 => try self.nextImage(-1),
+        276 => try self.nextImage(1),
+        else => {},
+    }
+}
+
 fn readEvents(self: *App) !void {
     _ = self.window.wl_display.dispatchPending();
 
@@ -141,6 +149,10 @@ fn readEvents(self: *App) !void {
     if (size > 0) {
         switch (event) {
             .keyboard => |keysym| try self.keyboardHandler(keysym),
+            .pointer => |e| switch (e) {
+                .button => |button| try self.pointerPressedHandler(button),
+                .scroll => |scroll| self.renderer.move(if (scroll < 0) .up else .down),
+            },
             .resize => |dim| {
                 const width, const height = dim;
                 self.renderer.setViewport(width, height);

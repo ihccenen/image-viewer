@@ -20,6 +20,92 @@ const c = @cImport({
 const Keyboard = @import("Keyboard.zig");
 const Event = @import("event.zig").Event;
 
+pub fn dispatchEvent(self: Window) void {
+    _ = std.posix.write(self.pipe_fds[1], std.mem.asBytes(&self.event)) catch return;
+}
+
+fn onTimer(sigval: c.union_sigval) callconv(.C) void {
+    const window = @as(*Window, @ptrCast(@alignCast(sigval.sival_ptr)));
+    window.dispatchEvent();
+}
+
+pub fn setTimer(self: *Window, repeats: bool, pressed: bool) void {
+    if (!pressed) {
+        const its = c.itimerspec{
+            .it_value = c.timespec{
+                .tv_sec = 0,
+                .tv_nsec = 0,
+            },
+            .it_interval = c.timespec{
+                .tv_sec = 0,
+                .tv_nsec = 0,
+            },
+        };
+
+        if (c.timer_settime(self.timer_id, 0, &its, null) == -1) {
+            unreachable;
+        }
+
+        return;
+    }
+
+    self.dispatchEvent();
+
+    if (repeats) {
+        const its = c.itimerspec{
+            .it_value = c.timespec{
+                .tv_sec = 0,
+                .tv_nsec = self.repeat_delay * 1000 * 1000,
+            },
+            .it_interval = c.timespec{
+                .tv_sec = 0,
+                .tv_nsec = self.repeat_interval * 1000 * 1000,
+            },
+        };
+
+        if (c.timer_settime(self.timer_id, 0, &its, null) == -1) {
+            unreachable;
+        }
+    }
+}
+
+fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) void {
+    switch (event) {
+        .enter => {},
+        .leave => {},
+        .motion => {},
+        .button => |b| {
+            window.event = .{
+                .pointer = .{
+                    .button = b.button,
+                },
+            };
+            window.setTimer(b.button == 275 or b.button == 276, b.state == .pressed);
+        },
+        .axis => |axis| {
+            switch (axis.axis) {
+                .vertical_scroll => {
+                    window.event = .{
+                        .pointer = .{
+                            .scroll = axis.value.toInt(),
+                        },
+                    };
+
+                    window.dispatchEvent();
+                },
+                .horizontal_scroll => {},
+                _ => {},
+            }
+        },
+        .frame => {},
+        .axis_source => {},
+        .axis_stop => {},
+        .axis_discrete => {},
+        .axis_value120 => {},
+        .axis_relative_direction => {},
+    }
+}
+
 fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, window: *Window) void {
     switch (event) {
         .keymap => |keymap| {
@@ -31,7 +117,11 @@ fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, window: *Window) 
         .enter => {},
         .leave => {},
         .key => |key| {
-            window.dispatchKey(key.key, key.state == .pressed);
+            const keysym = window.keyboard.getOneSym(key.key);
+
+            window.keyboard.updateKey(key.key, key.state == .pressed);
+            window.event = .{ .keyboard = keysym };
+            window.setTimer(window.keyboard.keyRepeats(key.key), key.state == .pressed);
         },
         .modifiers => |modifiers| {
             window.keyboard.updateMods(modifiers.mods_depressed, modifiers.mods_latched, modifiers.mods_locked);
@@ -52,6 +142,11 @@ fn seatListener(_: *wl.Seat, event: wl.Seat.Event, window: *Window) void {
 
                 window.wl_keyboard = wl.Seat.getKeyboard(window.wl_seat) catch return;
                 window.wl_keyboard.setListener(*Window, keyboardListener, window);
+            }
+
+            if (e.capabilities.pointer) {
+                window.wl_pointer = wl.Seat.getPointer(window.wl_seat) catch return;
+                window.wl_pointer.setListener(*Window, pointerListener, window);
             }
         },
         .name => {},
@@ -99,7 +194,7 @@ fn xdgToplevelListener(_: *xdg.Toplevel, event: xdg.Toplevel.Event, window: *Win
                 window.width = @intCast(configure.width);
                 window.height = @intCast(configure.height);
                 wl.EglWindow.resize(window.egl_window, @intCast(window.width), @intCast(window.height), 0, 0);
-                const e = Event{ .resize = .{ window.width, window.height } };
+                const e = .{ .resize = .{ window.width, window.height } };
                 _ = std.posix.write(window.pipe_fds[1], std.mem.asBytes(&e)) catch return;
             }
         },
@@ -115,18 +210,13 @@ fn setNonBlock(fd: std.posix.fd_t) void {
     _ = std.posix.fcntl(fd, std.posix.F.SETFL, flags) catch unreachable;
 }
 
-fn onTimer(sigval: c.union_sigval) callconv(.C) void {
-    const window = @as(*Window, @ptrCast(@alignCast(sigval.sival_ptr)));
-
-    window.writeKeypress(window.repeat_keycode);
-}
-
 wl_display: *wl.Display = undefined,
 wl_registry: *wl.Registry = undefined,
 wl_compositor: *wl.Compositor = undefined,
 wl_surface: *wl.Surface = undefined,
 wl_seat: *wl.Seat = undefined,
 wl_keyboard: *wl.Keyboard = undefined,
+wl_pointer: *wl.Pointer = undefined,
 
 wm_base: *xdg.WmBase = undefined,
 xdg_surface: *xdg.Surface = undefined,
@@ -141,8 +231,9 @@ egl_window: *wl.EglWindow = undefined,
 width: usize = 0,
 height: usize = 0,
 
+event: Event = undefined,
+
 keyboard: Keyboard = undefined,
-repeat_keycode: u32 = undefined,
 repeat_delay: i32 = 400,
 repeat_interval: i32 = 80,
 
@@ -274,6 +365,7 @@ pub fn deinit(self: *Window) void {
     self.keyboard.deinit();
 
     self.wl_keyboard.release();
+    self.wl_pointer.release();
     self.wl_seat.destroy();
     self.wl_surface.destroy();
     self.wl_registry.destroy();
@@ -303,54 +395,4 @@ pub fn swapBuffers(self: *Window) !void {
 
 pub fn shouldClose(self: *Window) bool {
     return !self.running;
-}
-
-pub fn writeKeypress(self: Window, keycode: u32) void {
-    const keysym = self.keyboard.getOneSym(keycode);
-    const event = Event{ .keyboard = keysym };
-
-    _ = std.posix.write(self.pipe_fds[1], std.mem.asBytes(&event)) catch return;
-}
-
-pub fn dispatchKey(self: *Window, keycode: u32, pressed: bool) void {
-    self.keyboard.updateKey(keycode, pressed);
-
-    if (!pressed) {
-        const its = c.itimerspec{
-            .it_value = c.timespec{
-                .tv_sec = 0,
-                .tv_nsec = 0,
-            },
-            .it_interval = c.timespec{
-                .tv_sec = 0,
-                .tv_nsec = 0,
-            },
-        };
-
-        if (c.timer_settime(self.timer_id, 0, &its, null) == -1) {
-            unreachable;
-        }
-
-        return;
-    }
-
-    self.writeKeypress(keycode);
-
-    if (self.keyboard.keyRepeats(keycode)) {
-        self.repeat_keycode = keycode;
-        const its = c.itimerspec{
-            .it_value = c.timespec{
-                .tv_sec = 0,
-                .tv_nsec = self.repeat_delay * 1000 * 1000,
-            },
-            .it_interval = c.timespec{
-                .tv_sec = 0,
-                .tv_nsec = self.repeat_interval * 1000 * 1000,
-            },
-        };
-
-        if (c.timer_settime(self.timer_id, 0, &its, null) == -1) {
-            unreachable;
-        }
-    }
 }
