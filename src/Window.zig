@@ -75,12 +75,18 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
         .leave => {},
         .motion => {},
         .button => |b| {
-            window.event = .{
-                .pointer = .{
-                    .button = b.button,
+            switch (b.button) {
+                274 => window.running = false,
+                275, 276 => {
+                    window.event = .{
+                        .pointer = .{
+                            .button = b.button,
+                        },
+                    };
+                    window.setTimer(true, b.state == .pressed);
                 },
-            };
-            window.setTimer(b.button == 275 or b.button == 276, b.state == .pressed);
+                else => {},
+            }
         },
         .axis => |axis| {
             switch (axis.axis) {
