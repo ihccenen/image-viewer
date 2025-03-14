@@ -194,8 +194,8 @@ fn xdgToplevelListener(_: *xdg.Toplevel, event: xdg.Toplevel.Event, window: *Win
                 window.width = @intCast(configure.width);
                 window.height = @intCast(configure.height);
                 wl.EglWindow.resize(window.egl_window, @intCast(window.width), @intCast(window.height), 0, 0);
-                const e = .{ .resize = .{ window.width, window.height } };
-                _ = std.posix.write(window.pipe_fds[1], std.mem.asBytes(&e)) catch return;
+                window.event = .{ .resize = .{ window.width, window.height } };
+                window.dispatchEvent();
             }
         },
         .configure_bounds => {},
