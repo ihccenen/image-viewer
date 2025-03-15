@@ -141,12 +141,12 @@ fn readEvents(self: *App) !void {
 
     var event: Event = undefined;
 
-    const size = std.posix.read(self.window.pipe_fds[0], std.mem.asBytes(&event)) catch |e| switch (e) {
-        error.WouldBlock => 0,
-        else => unreachable,
-    };
+    while (true) {
+        _ = std.posix.read(self.window.pipe_fds[0], std.mem.asBytes(&event)) catch |e| switch (e) {
+            error.WouldBlock => break,
+            else => unreachable,
+        };
 
-    if (size > 0) {
         switch (event) {
             .keyboard => |keysym| try self.keyboardHandler(keysym),
             .pointer => |e| switch (e) {
