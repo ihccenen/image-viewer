@@ -152,6 +152,10 @@ fn readEvents(self: *App) !void {
             .pointer => |e| switch (e) {
                 .button => |button| try self.pointerPressedHandler(button),
                 .axis => |axis| self.renderer.move(.vertical, if (axis < 0) -0.1 else 0.1),
+                .motion => |motion| {
+                    self.renderer.move(.horizontal, @as(f32, @floatFromInt(motion.x)) / @as(f32, @floatFromInt(self.window.width)));
+                    self.renderer.move(.vertical, -@as(f32, @floatFromInt(motion.y)) / @as(f32, @floatFromInt(self.window.height)));
+                },
             },
             .resize => |dim| {
                 const width, const height = dim;

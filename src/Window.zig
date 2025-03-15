@@ -71,11 +71,20 @@ pub fn setTimer(self: *Window, repeats: bool, pressed: bool) void {
 
 fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) void {
     switch (event) {
-        .enter => {},
+        .enter => |enter| {
+            window.pointer.current_x = @intCast(enter.surface_x.toInt());
+            window.pointer.current_y = @intCast(enter.surface_y.toInt());
+            window.pointer.last_x = @intCast(enter.surface_x.toInt());
+            window.pointer.last_y = @intCast(enter.surface_y.toInt());
+        },
         .leave => {},
-        .motion => {},
+        .motion => |motion| {
+            window.pointer.current_x = @intCast(motion.surface_x.toInt());
+            window.pointer.current_y = @intCast(motion.surface_y.toInt());
+        },
         .button => |b| {
             switch (b.button) {
+                272 => window.pointer.right_button_pressed = b.state == .pressed,
                 274 => window.running = false,
                 275, 276 => {
                     window.event = .{
@@ -103,7 +112,25 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
                 _ => {},
             }
         },
-        .frame => {},
+        .frame => {
+            const dx = window.pointer.current_x - window.pointer.last_x;
+            const dy = window.pointer.current_y - window.pointer.last_y;
+
+            window.pointer.last_x = window.pointer.current_x;
+            window.pointer.last_y = window.pointer.current_y;
+
+            if ((dx != 0 or dy != 0) and window.pointer.right_button_pressed) {
+                window.event = .{
+                    .pointer = .{
+                        .motion = .{
+                            .x = dx,
+                            .y = dy,
+                        },
+                    },
+                };
+                window.dispatchEvent();
+            }
+        },
         .axis_source => {},
         .axis_stop => {},
         .axis_discrete => {},
@@ -238,6 +265,14 @@ width: usize = 0,
 height: usize = 0,
 
 event: Event = undefined,
+
+pointer: struct {
+    right_button_pressed: bool,
+    current_x: i32,
+    current_y: i32,
+    last_x: i32,
+    last_y: i32,
+} = undefined,
 
 keyboard: Keyboard = undefined,
 repeat_delay: i32 = 400,

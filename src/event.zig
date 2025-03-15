@@ -6,6 +6,7 @@ pub const Event = union(enum) {
     pointer: union(enum) {
         button: u32,
         axis: i24,
+        motion: struct { x: i32, y: i32 },
     },
     resize: struct { usize, usize },
     image_loaded: usize,
