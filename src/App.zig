@@ -110,15 +110,15 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
     } else if (std.mem.orderZ(u8, &buf, "o") == .eq) {
         self.renderer.zoom(.none);
     } else if (std.mem.orderZ(u8, &buf, "k") == .eq) {
-        self.renderer.move(.up);
+        self.renderer.move(.vertical, -0.1);
     } else if (std.mem.orderZ(u8, &buf, "l") == .eq) {
-        self.renderer.move(.right);
+        self.renderer.move(.horizontal, -0.1);
     } else if (std.mem.orderZ(u8, &buf, "j") == .eq) {
-        self.renderer.move(.down);
+        self.renderer.move(.vertical, 0.1);
     } else if (std.mem.orderZ(u8, &buf, "h") == .eq) {
-        self.renderer.move(.left);
+        self.renderer.move(.horizontal, 0.1);
     } else if (std.mem.orderZ(u8, &buf, "m") == .eq) {
-        self.renderer.move(.center);
+        self.renderer.move(.center, 0.0);
     } else if (std.mem.orderZ(u8, &buf, "q") == .eq) {
         self.window.running = false;
     } else if (std.mem.orderZ(u8, &buf, "n") == .eq) {
@@ -151,7 +151,7 @@ fn readEvents(self: *App) !void {
             .keyboard => |keysym| try self.keyboardHandler(keysym),
             .pointer => |e| switch (e) {
                 .button => |button| try self.pointerPressedHandler(button),
-                .scroll => |scroll| self.renderer.move(if (scroll < 0) .up else .down),
+                .scroll => |scroll| self.renderer.move(.vertical, if (scroll < 0) -0.1 else 0.1),
             },
             .resize => |dim| {
                 const width, const height = dim;
