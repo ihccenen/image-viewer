@@ -93,7 +93,7 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
                 .vertical_scroll => {
                     window.event = .{
                         .pointer = .{
-                            .scroll = axis.value.toInt(),
+                            .axis = axis.value.toInt(),
                         },
                     };
 

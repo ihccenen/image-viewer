@@ -151,7 +151,7 @@ fn readEvents(self: *App) !void {
             .keyboard => |keysym| try self.keyboardHandler(keysym),
             .pointer => |e| switch (e) {
                 .button => |button| try self.pointerPressedHandler(button),
-                .scroll => |scroll| self.renderer.move(.vertical, if (scroll < 0) -0.1 else 0.1),
+                .axis => |axis| self.renderer.move(.vertical, if (axis < 0) -0.1 else 0.1),
             },
             .resize => |dim| {
                 const width, const height = dim;
