@@ -264,12 +264,18 @@ pub fn move(self: *Renderer, direction: Direction, step: f32) void {
     switch (direction) {
         .vertical => {
             if (self.scale.factor * self.texture.height > self.viewport.height) {
-                self.translate.y = self.translate.y + step;
+                self.translate.y = if (step > 0)
+                    @min(self.translate.y + step, -1 + self.translate.max_y)
+                else
+                    @max(self.translate.y + step, 1 - self.translate.max_y);
             }
         },
         .horizontal => {
             if (self.scale.factor * self.texture.width > self.viewport.width) {
-                self.translate.x = self.translate.x + step;
+                self.translate.x = if (step > 0)
+                    @min(self.translate.x + step, -1 + self.translate.max_x)
+                else
+                    @max(self.translate.x + step, 1 - self.translate.max_x);
             }
         },
         .center => {
