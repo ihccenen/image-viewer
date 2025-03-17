@@ -20,7 +20,7 @@ const c = @cImport({
 const Keyboard = @import("Keyboard.zig");
 const Event = @import("event.zig").Event;
 
-pub fn dispatchEvent(self: Window) void {
+fn dispatchEvent(self: Window) void {
     _ = std.posix.write(self.pipe_fds[1], std.mem.asBytes(&self.event)) catch return;
 }
 
@@ -29,7 +29,7 @@ fn onTimer(sigval: c.union_sigval) callconv(.C) void {
     window.dispatchEvent();
 }
 
-pub fn setTimer(self: *Window, repeats: bool, pressed: bool) void {
+fn setTimer(self: *Window, repeats: bool, pressed: bool) void {
     if (!pressed) {
         const its = c.itimerspec{
             .it_value = c.timespec{
@@ -375,7 +375,7 @@ pub fn init(self: *Window, width: usize, height: usize, title: [:0]u8) !void {
     self.pipe_fds = try std.posix.pipe();
 
     setNonBlock(self.pipe_fds[0]);
-    setNonBlock(self.pipe_fds[0]);
+    setNonBlock(self.pipe_fds[1]);
 
     var sigevent = c.sigevent{
         .sigev_notify = c.SIGEV_THREAD,
