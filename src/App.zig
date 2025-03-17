@@ -14,12 +14,11 @@ pub fn loadImage(image: *Image, path: [:0]u8, pipe_fd: std.posix.fd_t, index: us
 }
 
 window: *Window,
-renderer: *Renderer = undefined,
+renderer: *Renderer,
 paths: [][:0]u8,
 index: usize,
 image: Image = undefined,
 loading_image: bool,
-event: Event = undefined,
 allocator: Allocator,
 
 pub fn init(allocator: Allocator, paths: [][:0]u8) !App {
@@ -162,7 +161,6 @@ fn readEvents(self: *App) !void {
                 self.renderer.setViewport(width, height);
             },
             .image_loaded => |new_index| {
-                self.loading_image = false;
                 self.index = new_index;
                 self.renderer.setTexture(self.image);
                 self.image.deinit();
@@ -172,6 +170,8 @@ fn readEvents(self: *App) !void {
                 defer self.allocator.free(filename);
 
                 self.window.setTitle(filename);
+
+                self.loading_image = false;
             },
         }
     }
