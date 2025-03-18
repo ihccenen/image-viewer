@@ -1,3 +1,5 @@
+const App = @This();
+
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Window = @import("Window.zig");
@@ -5,19 +7,22 @@ const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
 const Event = @import("event.zig").Event;
 
-const App = @This();
-
-pub fn loadImage(image: *Image, path: [:0]u8, pipe_fd: std.posix.fd_t, index: usize) void {
-    image.* = Image.init(path) catch return;
-    const event = Event{ .image_loaded = @intCast(index) };
-    _ = std.posix.write(pipe_fd, std.mem.asBytes(&event)) catch return;
+pub fn loadImage(allocator: Allocator, path: [:0]u8, pipe_fd: std.posix.fd_t, index: usize) void {
+    const image = allocator.create(Image) catch unreachable;
+    image.* = Image.init(path) catch unreachable;
+    const event = Event{
+        .image = .{
+            .index = index,
+            .image = image,
+        },
+    };
+    _ = std.posix.write(pipe_fd, std.mem.asBytes(&event)) catch unreachable;
 }
 
 window: *Window,
 renderer: *Renderer,
 paths: [][:0]u8,
 index: usize,
-image: Image = undefined,
 loading_image: bool,
 allocator: Allocator,
 
@@ -89,7 +94,7 @@ fn nextImage(self: *App, step: isize) !void {
 
     if (!self.loading_image and next_index >= 0 and @as(usize, @intCast(next_index)) < self.paths.len) {
         self.loading_image = true;
-        var thread = try std.Thread.spawn(.{}, loadImage, .{ &self.image, self.paths[@intCast(next_index)], self.window.pipe_fds[1], @as(usize, @intCast(next_index)) });
+        var thread = try std.Thread.spawn(.{}, loadImage, .{ self.allocator, self.paths[@intCast(next_index)], self.window.pipe_fds[1], @as(usize, @intCast(next_index)) });
         thread.detach();
     }
 }
@@ -160,10 +165,10 @@ fn readEvents(self: *App) !void {
                 const width, const height = dim;
                 self.renderer.setViewport(width, height);
             },
-            .image_loaded => |new_index| {
-                self.index = new_index;
-                self.renderer.setTexture(self.image);
-                self.image.deinit();
+            .image => |image| {
+                defer self.allocator.destroy(image.image);
+                self.index = image.index;
+                self.renderer.setTexture(image.image.*);
 
                 const basename = std.fs.path.basename(self.paths[self.index]);
                 const filename = try std.fmt.allocPrintZ(self.allocator, "{d} of {d} - {s}", .{ self.index + 1, self.paths.len, basename });

@@ -9,5 +9,8 @@ pub const Event = union(enum) {
         motion: struct { x: i32, y: i32 },
     },
     resize: struct { usize, usize },
-    image_loaded: usize,
+    image: struct {
+        index: usize,
+        image: *Image,
+    },
 };
