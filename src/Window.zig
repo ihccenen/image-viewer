@@ -20,13 +20,14 @@ const c = @cImport({
 const Keyboard = @import("Keyboard.zig");
 const Event = @import("event.zig").Event;
 
-fn dispatchEvent(self: Window) void {
-    _ = std.posix.write(self.pipe_fds[1], std.mem.asBytes(&self.event)) catch return;
+fn dispatchEvent(self: Window, event: *Event) void {
+    _ = std.posix.write(self.pipe_fds[1], std.mem.asBytes(event)) catch return;
 }
 
 fn onTimer(sigval: c.union_sigval) callconv(.C) void {
     const window = @as(*Window, @ptrCast(@alignCast(sigval.sival_ptr)));
-    window.dispatchEvent();
+    var e: Event = .{ .keyboard = window.repeat_key };
+    window.dispatchEvent(&e);
 }
 
 fn setTimer(self: *Window, repeats: bool, pressed: bool) void {
@@ -49,7 +50,8 @@ fn setTimer(self: *Window, repeats: bool, pressed: bool) void {
         return;
     }
 
-    self.dispatchEvent();
+    var e: Event = .{ .keyboard = self.repeat_key };
+    self.dispatchEvent(&e);
 
     if (repeats) {
         const its = c.itimerspec{
@@ -87,12 +89,14 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
                 272 => window.pointer.right_button_pressed = b.state == .pressed,
                 274 => window.running = false,
                 275, 276 => {
-                    window.event = .{
-                        .pointer = .{
-                            .button = b.button,
-                        },
-                    };
-                    window.setTimer(true, b.state == .pressed);
+                    if (b.state == .pressed) {
+                        var e: Event = .{
+                            .pointer = .{
+                                .button = b.button,
+                            },
+                        };
+                        window.dispatchEvent(&e);
+                    }
                 },
                 else => {},
             }
@@ -100,13 +104,12 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
         .axis => |axis| {
             switch (axis.axis) {
                 .vertical_scroll => {
-                    window.event = .{
+                    var e: Event = .{
                         .pointer = .{
                             .axis = axis.value.toInt(),
                         },
                     };
-
-                    window.dispatchEvent();
+                    window.dispatchEvent(&e);
                 },
                 .horizontal_scroll => {},
                 _ => {},
@@ -120,7 +123,7 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
             window.pointer.last_y = window.pointer.current_y;
 
             if ((dx != 0 or dy != 0) and window.pointer.right_button_pressed) {
-                window.event = .{
+                var e: Event = .{
                     .pointer = .{
                         .motion = .{
                             .x = dx,
@@ -128,7 +131,7 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
                         },
                     },
                 };
-                window.dispatchEvent();
+                window.dispatchEvent(&e);
             }
         },
         .axis_source => {},
@@ -153,7 +156,7 @@ fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, window: *Window) 
             const keysym = window.keyboard.getOneSym(key.key);
 
             window.keyboard.updateKey(key.key, key.state == .pressed);
-            window.event = .{ .keyboard = keysym };
+            window.repeat_key = keysym;
             window.setTimer(window.keyboard.keyRepeats(key.key), key.state == .pressed);
         },
         .modifiers => |modifiers| {
@@ -227,8 +230,8 @@ fn xdgToplevelListener(_: *xdg.Toplevel, event: xdg.Toplevel.Event, window: *Win
                 window.width = @intCast(configure.width);
                 window.height = @intCast(configure.height);
                 wl.EglWindow.resize(window.egl_window, @intCast(window.width), @intCast(window.height), 0, 0);
-                window.event = .{ .resize = .{ window.width, window.height } };
-                window.dispatchEvent();
+                var e: Event = .{ .resize = .{ window.width, window.height } };
+                window.dispatchEvent(&e);
             }
         },
         .configure_bounds => {},
@@ -264,8 +267,6 @@ egl_window: *wl.EglWindow = undefined,
 width: usize = 0,
 height: usize = 0,
 
-event: Event = undefined,
-
 pointer: struct {
     right_button_pressed: bool,
     current_x: i32,
@@ -275,6 +276,7 @@ pointer: struct {
 } = undefined,
 
 keyboard: Keyboard = undefined,
+repeat_key: u32 = 0,
 repeat_delay: i32 = 400,
 repeat_interval: i32 = 80,
 
