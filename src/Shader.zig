@@ -15,7 +15,7 @@ const vertex =
     \\
     \\ void main()
     \\ {
-    \\     gl_Position = translate * scale * vec4(vPos, 1.0);
+    \\     gl_Position = scale * translate * vec4(vPos, 1.0);
     \\     TexCoord = vTexCoord;
     \\ }
 ;

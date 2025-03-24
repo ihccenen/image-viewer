@@ -120,34 +120,27 @@ pub fn resetScaleAndTranslate(self: *Renderer) void {
     self.scale.factor = 1.0;
     self.fit.state = .none;
 
-    if (self.texture.width > self.viewport.width) {
-        self.translate.x = -1.0 + (self.texture.width / self.viewport.width);
-    } else {
-        self.translate.x = 0.0;
-    }
+    self.translate.max_x = @max((self.texture.width - self.viewport.width) / self.texture.width, 0);
+    self.translate.max_y = @max((self.texture.height - self.viewport.height) / self.texture.height, 0);
 
-    if (self.texture.height > self.viewport.height) {
-        self.translate.y = 1.0 - (self.texture.height / self.viewport.height);
-    } else {
-        self.translate.y = 0.0;
-    }
+    self.translate.x = self.translate.max_x;
+    self.translate.y = -self.translate.max_y;
 
     self.need_redraw = true;
 }
 
 pub fn setFit(self: *Renderer, state: Fit) void {
     self.fit.state = state;
+    self.translate.x = 0.0;
 
     switch (state) {
         .width => {
             self.translate.x = 0.0;
             self.scale.factor = self.fit.width;
-            self.translate.max_x = (self.scale.factor * self.texture.width) / self.viewport.width;
-            self.translate.max_y = (self.scale.factor * self.texture.height) / self.viewport.height;
-            self.translate.y = if (self.viewport.height > self.scale.factor * self.texture.height) 0.0 else 1.0 - self.translate.max_y;
+            self.translate.max_y = (self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height);
+            self.translate.y = if (self.viewport.height > self.scale.factor * self.texture.height) 0.0 else -self.translate.max_y;
         },
         .both => {
-            self.translate.x = 0.0;
             self.translate.y = 0.0;
             self.scale.factor = self.fit.both;
         },
@@ -167,9 +160,6 @@ pub fn setTexture(self: *Renderer, image: Image) void {
     self.fit.width = self.viewport.width / self.texture.width;
     self.fit.both = @min(self.fit.width, self.viewport.height / self.texture.height);
     self.setFit(self.fit.state);
-
-    self.translate.max_x = (self.scale.factor * self.texture.width) / self.viewport.width;
-    self.translate.max_y = (self.scale.factor * self.texture.height) / self.viewport.height;
 
     const width = image.width / 2;
     const height = image.height / 2;
@@ -210,8 +200,8 @@ pub fn setViewport(self: *Renderer, width: usize, height: usize) void {
     self.fit.both = @min(self.fit.width, self.viewport.height / self.texture.height);
     self.setFit(self.fit.state);
 
-    self.translate.max_x = (self.scale.factor * self.texture.width) / self.viewport.width;
-    self.translate.max_y = (self.scale.factor * self.texture.height) / self.viewport.height;
+    self.translate.max_x = @max((self.texture.width - self.viewport.width) / self.texture.width, 0);
+    self.translate.max_y = @max((self.texture.height - self.viewport.height) / self.texture.height, 0);
 
     gl.glViewport(0, 0, @intFromFloat(self.viewport.width), @intFromFloat(self.viewport.height));
 
@@ -236,18 +226,14 @@ pub fn zoom(self: *Renderer, action: Zoom) void {
     self.scale.width = self.scale.factor * (self.texture.width / self.viewport.width);
     self.scale.height = self.scale.factor * (self.texture.height / self.viewport.height);
 
-    self.translate.max_x = (self.scale.factor * self.texture.width) / self.viewport.width;
-    self.translate.max_y = (self.scale.factor * self.texture.height) / self.viewport.height;
+    self.translate.max_x = @max((self.scale.factor * self.texture.width - self.viewport.width) / (self.scale.factor * self.texture.width), 0);
+    self.translate.max_y = @max((self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height), 0);
 
-    if (self.scale.factor * self.texture.width > self.viewport.width) {
-        self.translate.x = if (self.translate.x < 0) @max(self.translate.x, 1 - self.translate.max_x) else @min(self.translate.x, -1 + self.translate.max_x);
-    } else if (self.scale.factor * self.texture.width <= self.viewport.width) {
+    if (self.scale.factor * self.texture.width <= self.viewport.width) {
         self.translate.x = 0;
     }
 
-    if (self.scale.factor * self.texture.height > self.viewport.height) {
-        self.translate.y = if (self.translate.y < 0) @max(self.translate.y, 1 - self.translate.max_y) else @min(self.translate.y, -1 + self.translate.max_y);
-    } else if (self.scale.factor * self.texture.height <= self.viewport.height) {
+    if (self.scale.factor * self.texture.height <= self.viewport.height) {
         self.translate.y = 0;
     }
 
@@ -265,17 +251,17 @@ pub fn move(self: *Renderer, direction: Direction, step: f32) void {
         .vertical => {
             if (self.scale.factor * self.texture.height > self.viewport.height) {
                 self.translate.y = if (step > 0)
-                    @min(self.translate.y + step, -1 + self.translate.max_y)
+                    @min(self.translate.y + step, self.translate.max_y)
                 else
-                    @max(self.translate.y + step, 1 - self.translate.max_y);
+                    @max(self.translate.y + step, -self.translate.max_y);
             }
         },
         .horizontal => {
             if (self.scale.factor * self.texture.width > self.viewport.width) {
                 self.translate.x = if (step > 0)
-                    @min(self.translate.x + step, -1 + self.translate.max_x)
+                    @min(self.translate.x + step, self.translate.max_x)
                 else
-                    @max(self.translate.x + step, 1 - self.translate.max_x);
+                    @max(self.translate.x + step, -self.translate.max_x);
             }
         },
         .center => {
