@@ -229,13 +229,8 @@ pub fn zoom(self: *Renderer, action: Zoom) void {
     self.translate.max_x = @max((self.scale.factor * self.texture.width - self.viewport.width) / (self.scale.factor * self.texture.width), 0);
     self.translate.max_y = @max((self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height), 0);
 
-    if (self.scale.factor * self.texture.width <= self.viewport.width) {
-        self.translate.x = 0;
-    }
-
-    if (self.scale.factor * self.texture.height <= self.viewport.height) {
-        self.translate.y = 0;
-    }
+    self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
+    self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
 
     self.need_redraw = true;
 }
@@ -250,18 +245,12 @@ pub fn move(self: *Renderer, direction: Direction, step: f32) void {
     switch (direction) {
         .vertical => {
             if (self.scale.factor * self.texture.height > self.viewport.height) {
-                self.translate.y = if (step > 0)
-                    @min(self.translate.y + step, self.translate.max_y)
-                else
-                    @max(self.translate.y + step, -self.translate.max_y);
+                self.translate.y = @min(@max(self.translate.y + step, -self.translate.max_y), self.translate.max_y);
             }
         },
         .horizontal => {
             if (self.scale.factor * self.texture.width > self.viewport.width) {
-                self.translate.x = if (step > 0)
-                    @min(self.translate.x + step, self.translate.max_x)
-                else
-                    @max(self.translate.x + step, -self.translate.max_x);
+                self.translate.x = @min(@max(self.translate.x + step, -self.translate.max_x), self.translate.max_x);
             }
         },
         .center => {
