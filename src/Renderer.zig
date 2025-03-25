@@ -125,8 +125,6 @@ pub fn resetScaleAndTranslate(self: *Renderer) void {
 
     self.translate.x = self.translate.max_x;
     self.translate.y = -self.translate.max_y;
-
-    self.need_redraw = true;
 }
 
 pub fn setFit(self: *Renderer, state: Fit) void {
@@ -137,8 +135,8 @@ pub fn setFit(self: *Renderer, state: Fit) void {
         .width => {
             self.translate.x = 0.0;
             self.scale.factor = self.fit.width;
-            self.translate.max_y = (self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height);
-            self.translate.y = if (self.viewport.height > self.scale.factor * self.texture.height) 0.0 else -self.translate.max_y;
+            self.translate.max_y = @max((self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height), 0);
+            self.translate.y = self.translate.max_y;
         },
         .both => {
             self.translate.y = 0.0;
@@ -159,7 +157,6 @@ pub fn setTexture(self: *Renderer, image: Image) void {
 
     self.fit.width = self.viewport.width / self.texture.width;
     self.fit.both = @min(self.fit.width, self.viewport.height / self.texture.height);
-    self.setFit(self.fit.state);
 
     const width = image.width / 2;
     const height = image.height / 2;
@@ -189,7 +186,7 @@ pub fn setTexture(self: *Renderer, image: Image) void {
         }
     }
 
-    self.need_redraw = true;
+    self.setFit(self.fit.state);
 }
 
 pub fn setViewport(self: *Renderer, width: usize, height: usize) void {
@@ -198,14 +195,13 @@ pub fn setViewport(self: *Renderer, width: usize, height: usize) void {
 
     self.fit.width = self.viewport.width / self.texture.width;
     self.fit.both = @min(self.fit.width, self.viewport.height / self.texture.height);
-    self.setFit(self.fit.state);
 
     self.translate.max_x = @max((self.texture.width - self.viewport.width) / self.texture.width, 0);
     self.translate.max_y = @max((self.texture.height - self.viewport.height) / self.texture.height, 0);
 
     gl.glViewport(0, 0, @intFromFloat(self.viewport.width), @intFromFloat(self.viewport.height));
 
-    self.need_redraw = true;
+    self.setFit(self.fit.state);
 }
 
 pub const Zoom = enum {
@@ -215,7 +211,7 @@ pub const Zoom = enum {
 };
 
 pub fn zoom(self: *Renderer, action: Zoom) void {
-    self.fit.state = .none;
+    self.fit.state = .both;
 
     switch (action) {
         .in => self.scale.factor = @max(self.scale.factor * @sqrt(2.0), 1.0 / 1024.0),
