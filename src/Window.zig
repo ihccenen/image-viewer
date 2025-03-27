@@ -226,13 +226,14 @@ fn xdgSurfaceListener(xdg_surface: *xdg.Surface, event: xdg.Surface.Event, windo
 fn xdgToplevelListener(_: *xdg.Toplevel, event: xdg.Toplevel.Event, window: *Window) void {
     switch (event) {
         .configure => |configure| {
-            if (window.width != configure.width and window.height != configure.height) {
+            if (configure.width != 0 and configure.height != 0) {
                 window.width = @intCast(configure.width);
                 window.height = @intCast(configure.height);
-                wl.EglWindow.resize(window.egl_window, @intCast(window.width), @intCast(window.height), 0, 0);
-                var e: Event = .{ .resize = .{ window.width, window.height } };
-                window.dispatchEvent(&e);
             }
+
+            wl.EglWindow.resize(window.egl_window, @intCast(window.width), @intCast(window.height), 0, 0);
+            var e: Event = .{ .resize = .{ window.width, window.height } };
+            window.dispatchEvent(&e);
         },
         .configure_bounds => {},
         .wm_capabilities => {},
