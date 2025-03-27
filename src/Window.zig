@@ -227,11 +227,11 @@ fn xdgToplevelListener(_: *xdg.Toplevel, event: xdg.Toplevel.Event, window: *Win
     switch (event) {
         .configure => |configure| {
             if (configure.width != 0 and configure.height != 0) {
-                window.width = @intCast(configure.width);
-                window.height = @intCast(configure.height);
+                window.width = configure.width;
+                window.height = configure.height;
             }
 
-            wl.EglWindow.resize(window.egl_window, @intCast(window.width), @intCast(window.height), 0, 0);
+            wl.EglWindow.resize(window.egl_window, window.width, window.height, 0, 0);
             var e: Event = .{ .resize = .{ window.width, window.height } };
             window.dispatchEvent(&e);
         },
@@ -265,8 +265,8 @@ egl_context: c.EGLContext = undefined,
 egl_surface: c.EGLSurface = undefined,
 egl_window: *wl.EglWindow = undefined,
 
-width: usize = 0,
-height: usize = 0,
+width: c_int = 0,
+height: c_int = 0,
 
 pointer: struct {
     right_button_pressed: bool,
@@ -287,7 +287,7 @@ timer_id: c.timer_t = undefined,
 
 running: bool = false,
 
-pub fn init(self: *Window, width: usize, height: usize, title: [:0]u8) !void {
+pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]u8) !void {
     self.wl_display = try wl.Display.connect(null);
     self.wl_registry = try self.wl_display.getRegistry();
 
@@ -374,6 +374,8 @@ pub fn init(self: *Window, width: usize, height: usize, title: [:0]u8) !void {
     self.wl_surface.commit();
     if (self.wl_display.roundtrip() != .SUCCESS) return error.RoundtripFailed;
 
+    self.width = width;
+    self.height = height;
     self.running = true;
     self.pipe_fds = try std.posix.pipe();
 

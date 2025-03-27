@@ -8,7 +8,7 @@ pub const Event = union(enum) {
         axis: i24,
         motion: struct { x: i32, y: i32 },
     },
-    resize: struct { usize, usize },
+    resize: struct { c_int, c_int },
     image: struct {
         index: usize,
         image: *Image,

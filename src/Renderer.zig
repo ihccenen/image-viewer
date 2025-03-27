@@ -189,7 +189,7 @@ pub fn setTexture(self: *Renderer, image: Image) void {
     self.setFit(self.fit.state);
 }
 
-pub fn setViewport(self: *Renderer, width: usize, height: usize) void {
+pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
     self.viewport.width = @floatFromInt(width);
     self.viewport.height = @floatFromInt(height);
 
