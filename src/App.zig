@@ -31,7 +31,7 @@ pub fn init(allocator: Allocator, paths: [][:0]u8) !App {
     const basename = std.fs.path.basename(paths[0]);
     const filename = try std.fmt.allocPrintZ(allocator, "{d} of {d} - {s}", .{ 1, paths.len, basename });
     defer allocator.free(filename);
-    try window.init(1, 1, filename);
+    try window.init(1280, 720, filename);
 
     var renderer = try allocator.create(Renderer);
     renderer.* = try Renderer.init();
@@ -71,11 +71,15 @@ fn waitEvent(self: *App) void {
         },
     };
 
-    if (!self.window.wl_display.prepareRead()) {
-        return;
+    while (!self.window.wl_display.prepareRead()) {
+        if (self.window.wl_display.dispatchPending() != .SUCCESS) {
+            return;
+        }
     }
 
-    _ = self.window.wl_display.flush();
+    if (self.window.wl_display.flush() != .SUCCESS) {
+        return;
+    }
 
     _ = std.posix.poll(&pfds, -1) catch {
         self.window.wl_display.cancelRead();
@@ -83,10 +87,14 @@ fn waitEvent(self: *App) void {
     };
 
     if (pfds[0].revents != 0 & std.os.linux.POLL.IN) {
-        _ = self.window.wl_display.readEvents();
+        if (self.window.wl_display.readEvents() != .SUCCESS) {
+            return;
+        }
     } else {
-        _ = self.window.wl_display.cancelRead();
+        self.window.wl_display.cancelRead();
     }
+
+    _ = self.window.wl_display.dispatchPending();
 }
 
 fn nextImage(self: *App, step: isize) !void {
@@ -141,8 +149,6 @@ fn pointerPressedHandler(self: *App, button: u32) !void {
 }
 
 fn readEvents(self: *App) !void {
-    _ = self.window.wl_display.dispatchPending();
-
     var event: Event = undefined;
 
     while (true) {
