@@ -112,15 +112,15 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
     self.window.keyboard.getName(keysym, &buf);
 
     if (std.mem.orderZ(u8, &buf, "plus") == .eq) {
-        self.renderer.zoom(.in);
+        self.renderer.setZoom(.in);
     } else if (std.mem.orderZ(u8, &buf, "minus") == .eq) {
-        self.renderer.zoom(.out);
+        self.renderer.setZoom(.out);
     } else if (std.mem.orderZ(u8, &buf, "s") == .eq) {
         self.renderer.setFit(.width);
     } else if (std.mem.orderZ(u8, &buf, "w") == .eq) {
         self.renderer.setFit(.both);
     } else if (std.mem.orderZ(u8, &buf, "o") == .eq) {
-        self.renderer.zoom(.none);
+        self.renderer.setFit(.none);
     } else if (std.mem.orderZ(u8, &buf, "k") == .eq) {
         self.renderer.move(.vertical, -0.1);
     } else if (std.mem.orderZ(u8, &buf, "l") == .eq) {
@@ -175,6 +175,7 @@ fn readEvents(self: *App) !void {
                 defer self.allocator.destroy(image.image);
                 self.index = image.index;
                 self.renderer.setTexture(image.image.*);
+                self.renderer.applyFitAndTranslate();
 
                 const basename = std.fs.path.basename(self.paths[self.index]);
                 const filename = try std.fmt.allocPrintZ(self.allocator, "{d} of {d} - {s}", .{ self.index + 1, self.paths.len, basename });

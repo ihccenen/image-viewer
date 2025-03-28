@@ -5,7 +5,7 @@ const Shader = @import("Shader.zig");
 const Image = @import("Image.zig");
 const Mat4 = @import("math.zig").Mat4;
 
-pub const Fit = enum {
+const Fit = enum {
     width,
     both,
     none,
@@ -34,18 +34,14 @@ scale: struct {
     height: f32,
 },
 
-fit: struct {
-    state: Fit,
-    width: f32,
-    both: f32,
-},
-
 translate: struct {
     max_x: f32,
     x: f32,
     max_y: f32,
     y: f32,
 },
+
+fit: Fit,
 
 need_redraw: bool = false,
 
@@ -102,9 +98,9 @@ pub fn init() !Renderer {
         .ebo = ebo,
         .viewport = .{ .width = 0, .height = 0 },
         .texture = .{ .id = texture, .width = 0, .height = 0 },
-        .scale = .{ .factor = 1, .width = 1, .height = 1 },
-        .fit = .{ .state = .both, .width = 1, .both = 1 },
+        .scale = .{ .factor = 0, .width = 1, .height = 1 },
         .translate = .{ .max_x = 0, .x = 0, .max_y = 0, .y = 0 },
+        .fit = .both,
         .need_redraw = false,
     };
 }
@@ -116,47 +112,28 @@ pub fn deinit(self: *Renderer) void {
     gl.glDeleteBuffers(1, &self.ebo);
 }
 
-pub fn resetScaleAndTranslate(self: *Renderer) void {
-    self.scale.factor = 1.0;
-    self.fit.state = .none;
+fn setScaleFactor(self: *Renderer, factor: f32) void {
+    self.scale.factor = factor;
+    self.scale.width = self.scale.factor * (self.texture.width / self.viewport.width);
+    self.scale.height = self.scale.factor * (self.texture.height / self.viewport.height);
+    self.translate.max_x = @max((self.scale.factor * self.texture.width - self.viewport.width) / (self.scale.factor * self.texture.width), 0);
+    self.translate.max_y = @max((self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height), 0);
+}
 
-    self.translate.max_x = @max((self.texture.width - self.viewport.width) / self.texture.width, 0);
-    self.translate.max_y = @max((self.texture.height - self.viewport.height) / self.texture.height, 0);
+pub fn applyFitAndTranslate(self: *Renderer) void {
+    self.setScaleFactor(switch (self.fit) {
+        .width => self.viewport.width / self.texture.width,
+        .both => @min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height),
+        .none => 1.0,
+    });
 
     self.translate.x = self.translate.max_x;
     self.translate.y = -self.translate.max_y;
 }
 
-pub fn setFit(self: *Renderer, state: Fit) void {
-    self.fit.state = state;
-    self.translate.x = 0.0;
-
-    switch (state) {
-        .width => {
-            self.translate.x = 0.0;
-            self.scale.factor = self.fit.width;
-            self.translate.max_y = @max((self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height), 0);
-            self.translate.y = self.translate.max_y;
-        },
-        .both => {
-            self.translate.y = 0.0;
-            self.scale.factor = self.fit.both;
-        },
-        .none => self.resetScaleAndTranslate(),
-    }
-
-    self.scale.width = self.scale.factor * (self.texture.width / self.viewport.width);
-    self.scale.height = self.scale.factor * (self.texture.height / self.viewport.height);
-
-    self.need_redraw = true;
-}
-
 pub fn setTexture(self: *Renderer, image: Image) void {
     self.texture.width = @floatFromInt(image.width);
     self.texture.height = @floatFromInt(image.height);
-
-    self.fit.width = self.viewport.width / self.texture.width;
-    self.fit.both = @min(self.fit.width, self.viewport.height / self.texture.height);
 
     const width = image.width / 2;
     const height = image.height / 2;
@@ -186,44 +163,41 @@ pub fn setTexture(self: *Renderer, image: Image) void {
         }
     }
 
-    self.setFit(self.fit.state);
+    self.need_redraw = true;
+}
+
+pub fn setFit(self: *Renderer, fit: Fit) void {
+    self.fit = fit;
+    self.applyFitAndTranslate();
+    self.need_redraw = true;
 }
 
 pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
     self.viewport.width = @floatFromInt(width);
     self.viewport.height = @floatFromInt(height);
 
-    self.fit.width = self.viewport.width / self.texture.width;
-    self.fit.both = @min(self.fit.width, self.viewport.height / self.texture.height);
-
-    self.translate.max_x = @max((self.texture.width - self.viewport.width) / self.texture.width, 0);
-    self.translate.max_y = @max((self.texture.height - self.viewport.height) / self.texture.height, 0);
-
     gl.glViewport(0, 0, @intFromFloat(self.viewport.width), @intFromFloat(self.viewport.height));
 
-    self.setFit(self.fit.state);
+    if (self.scale.factor == 0) {
+        self.fit = .both;
+        self.applyFitAndTranslate();
+    } else {
+        self.setScaleFactor(self.scale.factor);
+    }
+
+    self.need_redraw = true;
 }
 
 pub const Zoom = enum {
     in,
     out,
-    none,
 };
 
-pub fn zoom(self: *Renderer, action: Zoom) void {
-    self.fit.state = .both;
-
-    switch (action) {
-        .in => self.scale.factor = @max(self.scale.factor * @sqrt(2.0), 1.0 / 1024.0),
-        .out => self.scale.factor = @min(self.scale.factor / @sqrt(2.0), 1024.0),
-        .none => self.resetScaleAndTranslate(),
-    }
-
-    self.scale.width = self.scale.factor * (self.texture.width / self.viewport.width);
-    self.scale.height = self.scale.factor * (self.texture.height / self.viewport.height);
-
-    self.translate.max_x = @max((self.scale.factor * self.texture.width - self.viewport.width) / (self.scale.factor * self.texture.width), 0);
-    self.translate.max_y = @max((self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height), 0);
+pub fn setZoom(self: *Renderer, zoom: Zoom) void {
+    self.setScaleFactor(switch (zoom) {
+        .in => @max(self.scale.factor * @sqrt(2.0), 1.0 / 1024.0),
+        .out => @min(self.scale.factor / @sqrt(2.0), 1024.0),
+    });
 
     self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
     self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
