@@ -59,16 +59,8 @@ pub fn deinit(self: *App) void {
 
 fn waitEvent(self: *App) void {
     var pfds = [_]std.posix.pollfd{
-        .{
-            .fd = self.window.wl_display_fd,
-            .events = std.os.linux.POLL.IN,
-            .revents = 0,
-        },
-        .{
-            .fd = self.window.pipe_fds[0],
-            .events = std.os.linux.POLL.IN,
-            .revents = 0,
-        },
+        .{ .fd = self.window.wl_display_fd, .events = std.os.linux.POLL.IN, .revents = undefined },
+        .{ .fd = self.window.pipe_fds[0], .events = std.os.linux.POLL.IN, .revents = undefined },
     };
 
     while (!self.window.wl_display.prepareRead()) {
