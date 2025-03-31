@@ -78,6 +78,12 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
             window.pointer.current_y = @intCast(enter.surface_y.toInt());
             window.pointer.last_x = @intCast(enter.surface_x.toInt());
             window.pointer.last_y = @intCast(enter.surface_y.toInt());
+            window.wl_pointer.setCursor(
+                enter.serial,
+                window.wl_cursor_surface,
+                @intCast(window.wl_cursor_image.hotspot_x),
+                @intCast(window.wl_cursor_image.hotspot_y),
+            );
         },
         .leave => {},
         .motion => |motion| {
@@ -202,6 +208,8 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, window: *W
         .global => |global| {
             if (mem.orderZ(u8, global.interface, wl.Compositor.interface.name) == .eq) {
                 window.wl_compositor = registry.bind(global.name, wl.Compositor, 1) catch return;
+            } else if (mem.orderZ(u8, global.interface, wl.Shm.interface.name) == .eq) {
+                window.wl_shm = registry.bind(global.name, wl.Shm, 1) catch return;
             } else if (mem.orderZ(u8, global.interface, wl.Seat.interface.name) == .eq) {
                 window.wl_seat = registry.bind(global.name, wl.Seat, 9) catch return;
                 window.wl_seat.setListener(*Window, seatListener, window);
@@ -249,11 +257,15 @@ fn setNonBlock(fd: std.posix.fd_t) void {
 
 wl_display: *wl.Display = undefined,
 wl_registry: *wl.Registry = undefined,
+wl_shm: *wl.Shm = undefined,
 wl_compositor: *wl.Compositor = undefined,
 wl_surface: *wl.Surface = undefined,
 wl_seat: *wl.Seat = undefined,
 wl_keyboard: *wl.Keyboard = undefined,
 wl_pointer: *wl.Pointer = undefined,
+
+wl_cursor_surface: *wl.Surface = undefined,
+wl_cursor_image: *wl.CursorImage = undefined,
 
 wm_base: *xdg.WmBase = undefined,
 xdg_surface: *xdg.Surface = undefined,
@@ -303,6 +315,18 @@ pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]u8) !void {
     self.xdg_surface.setListener(*Window, xdgSurfaceListener, self);
     self.xdg_toplevel.setTitle(title);
     self.xdg_toplevel.setListener(*Window, xdgToplevelListener, self);
+
+    const wl_cursor_theme = try wl.CursorTheme.load(null, 24, self.wl_shm);
+
+    const wl_cursor = wl_cursor_theme.getCursor("left_ptr").?;
+    self.wl_cursor_image = wl_cursor.images[0];
+
+    const wl_buffer = try self.wl_cursor_image.getBuffer();
+    defer wl_buffer.destroy();
+
+    self.wl_cursor_surface = try self.wl_compositor.createSurface();
+    self.wl_cursor_surface.attach(wl_buffer, 0, 0);
+    self.wl_cursor_surface.commit();
 
     self.egl_display = c.eglGetPlatformDisplay(c.EGL_PLATFORM_WAYLAND_KHR, self.wl_display, null);
 
@@ -414,6 +438,7 @@ pub fn deinit(self: *Window) void {
     self.wl_pointer.release();
     self.wl_seat.destroy();
     self.wl_surface.destroy();
+    self.wl_cursor_surface.destroy();
     self.wl_registry.destroy();
     self.wl_display.disconnect();
 

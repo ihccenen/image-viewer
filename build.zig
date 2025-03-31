@@ -18,12 +18,14 @@ pub fn build(b: *std.Build) void {
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
 
     scanner.generate("wl_compositor", 6);
+    scanner.generate("wl_shm", 1);
     scanner.generate("wl_seat", 9);
     scanner.generate("xdg_wm_base", 6);
 
     exe.root_module.addImport("wayland", wayland);
     exe.linkLibC();
     exe.linkSystemLibrary("wayland-client");
+    exe.linkSystemLibrary("wayland-cursor");
     exe.linkSystemLibrary("wayland-egl");
     exe.linkSystemLibrary("xkbcommon");
     exe.linkSystemLibrary("egl");
