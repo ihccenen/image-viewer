@@ -11,6 +11,6 @@ pub const Event = union(enum) {
     resize: struct { c_int, c_int },
     image: struct {
         index: usize,
-        image: *Image,
+        image: Image,
     },
 };
