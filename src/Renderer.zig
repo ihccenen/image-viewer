@@ -178,7 +178,7 @@ pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
 
     gl.glViewport(0, 0, @intFromFloat(self.viewport.width), @intFromFloat(self.viewport.height));
 
-    if (self.scale.factor == 0) {
+    if (self.scale.factor <= 0) {
         self.fit = .both;
         self.applyFitAndTranslate();
     } else {
