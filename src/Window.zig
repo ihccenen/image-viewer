@@ -301,11 +301,31 @@ running: bool = false,
 
 pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]u8) !void {
     self.wl_display = try wl.Display.connect(null);
-    self.wl_registry = try self.wl_display.getRegistry();
-
     self.wl_display_fd = self.wl_display.getFd();
+    self.pipe_fds = try std.posix.pipe();
 
+    setNonBlock(self.pipe_fds[0]);
+    setNonBlock(self.pipe_fds[1]);
+
+    var sigevent = c.sigevent{
+        .sigev_notify = c.SIGEV_THREAD,
+        .sigev_value = .{
+            .sival_ptr = self,
+        },
+        ._sigev_un = .{
+            ._sigev_thread = .{
+                ._function = onTimer,
+            },
+        },
+    };
+
+    if (c.timer_create(c.CLOCK_MONOTONIC, @ptrCast(&sigevent), &self.timer_id) == -1) {
+        return error.TimerCreate;
+    }
+
+    self.wl_registry = try self.wl_display.getRegistry();
     self.wl_registry.setListener(*Window, registryListener, self);
+
     if (self.wl_display.roundtrip() != .SUCCESS) return error.RoundtripFailed;
 
     self.wl_surface = try self.wl_compositor.createSurface();
@@ -398,29 +418,7 @@ pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]u8) !void {
     self.wl_surface.commit();
     if (self.wl_display.roundtrip() != .SUCCESS) return error.RoundtripFailed;
 
-    self.width = width;
-    self.height = height;
     self.running = true;
-    self.pipe_fds = try std.posix.pipe();
-
-    setNonBlock(self.pipe_fds[0]);
-    setNonBlock(self.pipe_fds[1]);
-
-    var sigevent = c.sigevent{
-        .sigev_notify = c.SIGEV_THREAD,
-        .sigev_value = .{
-            .sival_ptr = self,
-        },
-        ._sigev_un = .{
-            ._sigev_thread = .{
-                ._function = onTimer,
-            },
-        },
-    };
-
-    if (c.timer_create(c.CLOCK_MONOTONIC, @ptrCast(&sigevent), &self.timer_id) == -1) {
-        return error.TimerCreate;
-    }
 }
 
 pub fn deinit(self: *Window) void {
