@@ -156,8 +156,11 @@ fn readEvents(self: *App) !void {
                     .button => |button| try self.pointerPressedHandler(button),
                     .axis => |axis| self.renderer.move(.vertical, if (axis < 0) -0.1 else 0.1),
                     .motion => |motion| {
-                        self.renderer.move(.horizontal, @as(f32, @floatFromInt(motion.x)) / @as(f32, @floatFromInt(self.window.width)));
-                        self.renderer.move(.vertical, -@as(f32, @floatFromInt(motion.y)) / @as(f32, @floatFromInt(self.window.height)));
+                        const x = 1 / (self.renderer.scale.factor * self.renderer.texture.width / 2);
+                        const y = 1 / (self.renderer.scale.factor * self.renderer.texture.height / 2);
+
+                        self.renderer.move(.horizontal, @as(f32, @floatFromInt(motion.x)) * x);
+                        self.renderer.move(.vertical, @as(f32, @floatFromInt(motion.y)) * -y);
                     },
                 }
             },
