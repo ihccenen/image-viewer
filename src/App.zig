@@ -88,9 +88,15 @@ fn waitEvent(self: *App) void {
 }
 
 fn nextImage(self: *App, step: isize) !void {
-    const next_index = @as(isize, @intCast(self.index)) + step;
+    const next_index = @min(
+        self.paths.len - 1,
+        if (step < 0)
+            self.index -| @as(usize, @abs(step))
+        else
+            self.index +| @as(usize, @intCast(step)),
+    );
 
-    if (!self.loading_image and next_index >= 0 and @as(usize, @intCast(next_index)) < self.paths.len) {
+    if (!self.loading_image) {
         self.loading_image = true;
         var thread = try std.Thread.spawn(.{}, loadImage, .{ self.paths[@intCast(next_index)], self.window.pipe_fds[1], @as(usize, @intCast(next_index)) });
         thread.detach();
