@@ -7,14 +7,14 @@ const Event = Window.Event;
 const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
 
-fn loadImage(path: [:0]u8, pipe_fd: std.posix.fd_t, index: usize) void {
+fn loadNextImage(app: *App, next_image_index: usize) void {
     const event = Event{
         .image = .{
-            .index = index,
-            .image = Image.init(path) catch unreachable,
+            .index = next_image_index,
+            .image = Image.init(app.paths[next_image_index]) catch unreachable,
         },
     };
-    _ = std.posix.write(pipe_fd, std.mem.asBytes(&event)) catch unreachable;
+    _ = std.posix.write(app.window.pipe_fds[1], std.mem.asBytes(&event)) catch unreachable;
 }
 
 window: *Window,
@@ -98,7 +98,7 @@ fn nextImage(self: *App, step: isize) !void {
 
     if (!self.loading_image) {
         self.loading_image = true;
-        var thread = try std.Thread.spawn(.{}, loadImage, .{ self.paths[@intCast(next_index)], self.window.pipe_fds[1], @as(usize, @intCast(next_index)) });
+        var thread = try std.Thread.spawn(.{}, loadNextImage, .{ self, next_index });
         thread.detach();
     }
 }
