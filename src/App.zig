@@ -3,11 +3,11 @@ const App = @This();
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Window = @import("Window.zig");
+const Event = Window.Event;
 const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
-const Event = @import("event.zig").Event;
 
-pub fn loadImage(path: [:0]u8, pipe_fd: std.posix.fd_t, index: usize) void {
+fn loadImage(path: [:0]u8, pipe_fd: std.posix.fd_t, index: usize) void {
     const event = Event{
         .image = .{
             .index = index,
