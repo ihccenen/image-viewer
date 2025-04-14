@@ -107,6 +107,13 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
     var buf: [128:0]u8 = undefined;
     self.window.keyboard.getName(keysym, &buf);
 
+    if (std.mem.orderZ(u8, &buf, "q") == .eq) {
+        self.window.running = false;
+        return;
+    }
+
+    if (self.loading_image) return;
+
     if (std.mem.orderZ(u8, &buf, "plus") == .eq) {
         self.renderer.setZoom(.in);
     } else if (std.mem.orderZ(u8, &buf, "minus") == .eq) {
@@ -127,8 +134,6 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
         self.renderer.move(.horizontal, 0.1);
     } else if (std.mem.orderZ(u8, &buf, "m") == .eq) {
         self.renderer.move(.center, 0.0);
-    } else if (std.mem.orderZ(u8, &buf, "q") == .eq) {
-        self.window.running = false;
     } else if (std.mem.orderZ(u8, &buf, "n") == .eq) {
         try self.nextImage(1);
     } else if (std.mem.orderZ(u8, &buf, "p") == .eq) {
@@ -156,7 +161,7 @@ fn readEvents(self: *App) !void {
         if (n == 0) break;
 
         switch (event) {
-            .keyboard => |keysym| if (!self.loading_image) try self.keyboardHandler(keysym),
+            .keyboard => |keysym| try self.keyboardHandler(keysym),
             .pointer => |e| if (!self.loading_image) {
                 switch (e) {
                     .button => |button| try self.pointerPressedHandler(button),
