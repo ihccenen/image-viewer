@@ -107,8 +107,7 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
         .button => |b| {
             switch (b.button) {
                 272 => window.pointer.right_button_pressed = b.state == .pressed,
-                274 => window.running = false,
-                275, 276 => {
+                274, 275, 276 => {
                     if (b.state == .pressed) {
                         var e: Event = .{
                             .pointer = .{

@@ -143,6 +143,7 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
 
 fn pointerPressedHandler(self: *App, button: u32) !void {
     switch (button) {
+        274 => self.window.running = false,
         275 => try self.nextImage(-1),
         276 => try self.nextImage(1),
         else => {},
