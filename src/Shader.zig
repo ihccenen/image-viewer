@@ -98,8 +98,8 @@ pub fn use(self: Shader) void {
     gl.glUseProgram(self.id);
 }
 
-pub fn setInt(self: Shader, name: [:0]const u8, val: usize) void {
-    gl.glUniform1i(gl.glGetUniformLocation(self.id, name), @intCast(val));
+pub fn setInt(self: Shader, name: [:0]const u8, val: c_int) void {
+    gl.glUniform1i(gl.glGetUniformLocation(self.id, name), val);
 }
 
 pub fn setMat4(self: Shader, name: [:0]const u8, mat: Mat4) void {

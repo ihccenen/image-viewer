@@ -25,7 +25,7 @@ pub const Event = union(enum) {
     pointer: union(enum) {
         button: u32,
         axis: i24,
-        motion: struct { x: i32, y: i32 },
+        motion: struct { x: i24, y: i24 },
     },
     resize: struct { c_int, c_int },
     image: struct {
@@ -88,10 +88,10 @@ fn setTimer(self: *Window, repeats: bool, pressed: bool) void {
 fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) void {
     switch (event) {
         .enter => |enter| {
-            window.pointer.current_x = @intCast(enter.surface_x.toInt());
-            window.pointer.current_y = @intCast(enter.surface_y.toInt());
-            window.pointer.last_x = @intCast(enter.surface_x.toInt());
-            window.pointer.last_y = @intCast(enter.surface_y.toInt());
+            window.pointer.current_x = enter.surface_x.toInt();
+            window.pointer.current_y = enter.surface_y.toInt();
+            window.pointer.last_x = enter.surface_x.toInt();
+            window.pointer.last_y = enter.surface_y.toInt();
             window.wl_pointer.setCursor(
                 enter.serial,
                 window.wl_cursor_surface,
@@ -101,8 +101,8 @@ fn pointerListener(_: *wl.Pointer, event: wl.Pointer.Event, window: *Window) voi
         },
         .leave => {},
         .motion => |motion| {
-            window.pointer.current_x = @intCast(motion.surface_x.toInt());
-            window.pointer.current_y = @intCast(motion.surface_y.toInt());
+            window.pointer.current_x = motion.surface_x.toInt();
+            window.pointer.current_y = motion.surface_y.toInt();
         },
         .button => |b| {
             switch (b.button) {
@@ -296,10 +296,10 @@ height: c_int = 0,
 
 pointer: struct {
     right_button_pressed: bool,
-    current_x: i32,
-    current_y: i32,
-    last_x: i32,
-    last_y: i32,
+    current_x: i24,
+    current_y: i24,
+    last_x: i24,
+    last_y: i24,
 } = undefined,
 
 keyboard: Keyboard = undefined,
