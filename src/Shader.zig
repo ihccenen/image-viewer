@@ -25,7 +25,7 @@ const fragment =
     \\ in vec2 TexCoord;
     \\ out vec4 FragColor;
     \\
-    \\ uniform sampler2DArray textures;
+    \\ uniform sampler2DArray texture1;
     \\
     \\ void main()
     \\ {
@@ -39,7 +39,7 @@ const fragment =
     \\    float adjustedX = (TexCoord.x - float(layerX) * layerWidth) / layerWidth;
     \\    float adjustedY = (TexCoord.y - float(layerY) * layerHeight) / layerHeight;
     \\
-    \\    FragColor = texture(textures, vec3(adjustedX, adjustedY, layer));
+    \\    FragColor = texture(texture1, vec3(adjustedX, adjustedY, layer));
     \\ }
 ;
 

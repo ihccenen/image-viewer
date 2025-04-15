@@ -251,11 +251,11 @@ fn xdgToplevelListener(_: *xdg.Toplevel, event: xdg.Toplevel.Event, window: *Win
             if (configure.width != 0 and configure.height != 0) {
                 window.width = configure.width;
                 window.height = configure.height;
-            }
 
-            wl.EglWindow.resize(window.egl_window, window.width, window.height, 0, 0);
-            var e: Event = .{ .resize = .{ window.width, window.height } };
-            window.dispatchEvent(&e);
+                wl.EglWindow.resize(window.egl_window, window.width, window.height, 0, 0);
+                var e: Event = .{ .resize = .{ window.width, window.height } };
+                window.dispatchEvent(&e);
+            }
         },
         .configure_bounds => {},
         .wm_capabilities => {},

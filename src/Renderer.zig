@@ -89,7 +89,8 @@ pub fn init() !Renderer {
     gl.glTexParameteri(gl.GL_TEXTURE_2D_ARRAY, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE);
 
     const shader = try Shader.init();
-    shader.setInt("textures", 0);
+    shader.use();
+    shader.setInt("texture1", 0);
 
     return .{
         .shader = shader,
@@ -108,8 +109,7 @@ pub fn init() !Renderer {
 pub fn deinit(self: *Renderer) void {
     self.shader.deinit();
     gl.glDeleteVertexArrays(1, &self.vao);
-    gl.glDeleteBuffers(1, &self.vbo);
-    gl.glDeleteBuffers(1, &self.ebo);
+    gl.glDeleteBuffers(2, @ptrCast(&.{ self.vbo, self.ebo }));
 }
 
 fn setScaleFactor(self: *Renderer, factor: f32) void {
@@ -236,6 +236,7 @@ pub fn render(self: *Renderer) void {
     gl.glClearColor(0.0, 0.0, 0.0, 1.0);
     gl.glClear(gl.GL_COLOR_BUFFER_BIT);
 
+    gl.glActiveTexture(gl.GL_TEXTURE0);
     gl.glBindTexture(gl.GL_TEXTURE_2D_ARRAY, self.texture.id);
     self.shader.use();
     self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
