@@ -19,12 +19,12 @@ fn loadNextImage(app: *App, next_image_index: usize) void {
 
 window: *Window,
 renderer: *Renderer,
-paths: [][:0]u8,
+paths: [][:0]const u8,
 index: usize,
 loading_image: bool,
 allocator: Allocator,
 
-pub fn init(allocator: Allocator, paths: [][:0]u8) !App {
+pub fn init(allocator: Allocator, paths: [][:0]const u8) !App {
     var window = try allocator.create(Window);
     const basename = std.fs.path.basename(paths[0]);
     const filename = try std.fmt.allocPrintZ(allocator, "{d} of {d} - {s}", .{ 1, paths.len, basename });

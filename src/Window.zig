@@ -312,7 +312,7 @@ timer_id: c.timer_t = undefined,
 
 running: bool = false,
 
-pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]u8) !void {
+pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]const u8) !void {
     self.wl_display = try wl.Display.connect(null);
     self.wl_display_fd = self.wl_display.getFd();
     self.pipe_fds = try std.posix.pipe();
@@ -458,7 +458,7 @@ pub fn deinit(self: *Window) void {
     self.egl_window.destroy();
 }
 
-pub fn setTitle(self: Window, title: [:0]u8) void {
+pub fn setTitle(self: Window, title: [:0]const u8) void {
     self.xdg_toplevel.setTitle(title);
 }
 

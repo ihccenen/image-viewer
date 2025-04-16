@@ -4,11 +4,11 @@ const App = @import("App.zig");
 
 const supported_formats = [_][:0]const u8{ ".jpeg", ".jpg", ".png", ".psd" };
 
-fn lessThan(_: void, lhs: [:0]u8, rhs: [:0]u8) bool {
+fn lessThan(_: void, lhs: [:0]const u8, rhs: [:0]const u8) bool {
     return std.mem.orderZ(u8, lhs, rhs) == .lt;
 }
 
-fn isSupported(path: [:0]u8) bool {
+fn isSupported(path: [:0]const u8) bool {
     for (supported_formats) |extension| {
         if (std.ascii.endsWithIgnoreCase(path, extension)) return true;
     }
@@ -16,18 +16,23 @@ fn isSupported(path: [:0]u8) bool {
     return false;
 }
 
-fn appendImagePaths(allocator: Allocator, paths: *std.ArrayList([:0]u8), current_path: [:0]u8) !void {
-    var iter = (std.fs.cwd().openDir(current_path, .{ .iterate = true }) catch {
-        if (isSupported(current_path)) try paths.append(current_path);
-
+fn appendImagesPaths(allocator: Allocator, path_list: *std.ArrayListUnmanaged([:0]const u8), path: [:0]const u8) !void {
+    if (isSupported(path)) {
+        try path_list.append(allocator, path);
         return;
-    }).iterate();
+    }
 
-    while (try iter.next()) |entry| {
-        const path = try std.fs.path.joinZ(allocator, &[_][]const u8{ current_path, entry.name });
+    var walker = try (std.fs.cwd().openDir(path, .{ .iterate = true }) catch return).walk(allocator);
+    defer walker.deinit();
+
+    while (try walker.next()) |entry| {
         switch (entry.kind) {
-            .file => _ = if (isSupported(path)) try paths.append(path),
-            .directory => try appendImagePaths(allocator, paths, path),
+            .file => if (isSupported(entry.basename))
+                try path_list.append(
+                    allocator,
+                    try std.fs.path.joinZ(allocator, &.{ path, entry.path }),
+                ),
+
             else => {},
         }
     }
@@ -37,21 +42,21 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-    var paths = std.ArrayList([:0]u8).init(allocator);
-    defer paths.deinit();
+    var path_list: std.ArrayListUnmanaged([:0]const u8) = .empty;
+    defer path_list.deinit(allocator);
 
-    for (std.os.argv[1..]) |arg| {
-        try appendImagePaths(allocator, &paths, std.mem.span(arg));
+    for (std.os.argv[1..]) |path| {
+        try appendImagesPaths(allocator, &path_list, std.mem.span(path));
     }
 
-    if (paths.items.len < 1) {
+    if (path_list.items.len < 1) {
         std.debug.print("usage: {s} [image path]\n", .{std.fs.path.basename(std.mem.span(std.os.argv[0]))});
         return;
     }
 
-    std.mem.sort([:0]u8, paths.items, {}, lessThan);
+    std.mem.sort([:0]const u8, path_list.items, {}, lessThan);
 
-    var app = try App.init(allocator, paths.items);
+    var app = try App.init(allocator, path_list.items);
     defer app.deinit();
     try app.run();
 }
