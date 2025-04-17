@@ -166,25 +166,19 @@ pub fn setTexture(self: *Renderer, image: Image) void {
     self.need_redraw = true;
 }
 
-pub fn setFit(self: *Renderer, fit: Fit) void {
-    self.fit = fit;
-    self.applyFitAndTranslate();
-    self.need_redraw = true;
-}
-
 pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
     self.viewport.width = @floatFromInt(width);
     self.viewport.height = @floatFromInt(height);
+    self.setScaleFactor(@min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height));
 
     gl.glViewport(0, 0, @intFromFloat(self.viewport.width), @intFromFloat(self.viewport.height));
 
-    if (self.scale.factor <= 0) {
-        self.fit = .both;
-        self.applyFitAndTranslate();
-    } else {
-        self.setScaleFactor(self.scale.factor);
-    }
+    self.need_redraw = true;
+}
 
+pub fn setFit(self: *Renderer, fit: Fit) void {
+    self.fit = fit;
+    self.applyFitAndTranslate();
     self.need_redraw = true;
 }
 
@@ -205,7 +199,7 @@ pub fn setZoom(self: *Renderer, zoom: Zoom) void {
     self.need_redraw = true;
 }
 
-pub const Direction = enum {
+const Direction = enum {
     horizontal,
     vertical,
     center,
