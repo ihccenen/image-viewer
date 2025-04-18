@@ -125,9 +125,14 @@ pub fn applyFitAndTranslate(self: *Renderer) void {
         .both => @min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height),
         .none => 1.0,
     };
+
     self.updateScaleAndTranslateMax();
+
     self.translate.x = self.translate.max_x;
     self.translate.y = -self.translate.max_y;
+
+    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
+    self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
 }
 
 pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
@@ -141,8 +146,13 @@ pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
     gl.glViewport(0, 0, @intFromFloat(self.viewport.width), @intFromFloat(self.viewport.height));
 
     self.updateScaleAndTranslateMax();
+
     self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
     self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
+
+    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
+    self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
+
     self.need_redraw = true;
 }
 
@@ -183,7 +193,9 @@ pub fn setTexture(self: *Renderer, image: Image) void {
 
 pub fn setFit(self: *Renderer, fit: Fit) void {
     self.fit = fit;
+
     self.applyFitAndTranslate();
+
     self.need_redraw = true;
 }
 
@@ -199,8 +211,13 @@ pub fn setZoom(self: *Renderer, zoom: Zoom) void {
     };
 
     self.updateScaleAndTranslateMax();
+
     self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
     self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
+
+    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
+    self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
+
     self.need_redraw = true;
 }
 
@@ -228,19 +245,14 @@ pub fn move(self: *Renderer, direction: Direction, step: f32) void {
         },
     }
 
+    self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
+
     self.need_redraw = true;
 }
 
 pub fn render(self: *Renderer) void {
     gl.glClearColor(0.0, 0.0, 0.0, 1.0);
     gl.glClear(gl.GL_COLOR_BUFFER_BIT);
-
-    gl.glActiveTexture(gl.GL_TEXTURE0);
-    gl.glBindTexture(gl.GL_TEXTURE_2D_ARRAY, self.texture.id);
-    self.shader.use();
-    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
-    self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
-    gl.glBindVertexArray(self.vao);
     gl.glDrawElements(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, @ptrFromInt(0));
 
     self.need_redraw = false;
