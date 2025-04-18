@@ -112,8 +112,7 @@ pub fn deinit(self: *Renderer) void {
     gl.glDeleteBuffers(2, @ptrCast(&.{ self.vbo, self.ebo }));
 }
 
-fn setScaleFactor(self: *Renderer, factor: f32) void {
-    self.scale.factor = factor;
+fn updateScaleAndTranslateMax(self: *Renderer) void {
     self.scale.width = self.scale.factor * (self.texture.width / self.viewport.width);
     self.scale.height = self.scale.factor * (self.texture.height / self.viewport.height);
     self.translate.max_x = @max((self.scale.factor * self.texture.width - self.viewport.width) / (self.scale.factor * self.texture.width), 0);
@@ -121,14 +120,30 @@ fn setScaleFactor(self: *Renderer, factor: f32) void {
 }
 
 pub fn applyFitAndTranslate(self: *Renderer) void {
-    self.setScaleFactor(switch (self.fit) {
+    self.scale.factor = switch (self.fit) {
         .width => self.viewport.width / self.texture.width,
         .both => @min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height),
         .none => 1.0,
-    });
-
+    };
+    self.updateScaleAndTranslateMax();
     self.translate.x = self.translate.max_x;
     self.translate.y = -self.translate.max_y;
+}
+
+pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
+    self.viewport.width = @floatFromInt(width);
+    self.viewport.height = @floatFromInt(height);
+
+    if (self.scale.factor <= 0 or self.fit == .both) {
+        self.scale.factor = @min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height);
+    }
+
+    gl.glViewport(0, 0, @intFromFloat(self.viewport.width), @intFromFloat(self.viewport.height));
+
+    self.updateScaleAndTranslateMax();
+    self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
+    self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
+    self.need_redraw = true;
 }
 
 pub fn setTexture(self: *Renderer, image: Image) void {
@@ -166,16 +181,6 @@ pub fn setTexture(self: *Renderer, image: Image) void {
     self.need_redraw = true;
 }
 
-pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
-    self.viewport.width = @floatFromInt(width);
-    self.viewport.height = @floatFromInt(height);
-    self.setScaleFactor(@min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height));
-
-    gl.glViewport(0, 0, @intFromFloat(self.viewport.width), @intFromFloat(self.viewport.height));
-
-    self.need_redraw = true;
-}
-
 pub fn setFit(self: *Renderer, fit: Fit) void {
     self.fit = fit;
     self.applyFitAndTranslate();
@@ -188,14 +193,14 @@ pub const Zoom = enum {
 };
 
 pub fn setZoom(self: *Renderer, zoom: Zoom) void {
-    self.setScaleFactor(switch (zoom) {
+    self.scale.factor = switch (zoom) {
         .in => @max(self.scale.factor * @sqrt(2.0), 1.0 / 1024.0),
         .out => @min(self.scale.factor / @sqrt(2.0), 1024.0),
-    });
+    };
 
+    self.updateScaleAndTranslateMax();
     self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
     self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
-
     self.need_redraw = true;
 }
 
