@@ -7,7 +7,7 @@ const Event = Window.Event;
 const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
 
-fn loadNextImage(app: *App, next_image_index: usize) void {
+fn loadNextImage(app: App, next_image_index: usize) void {
     const event = Event{
         .image = .{
             .index = next_image_index,
@@ -48,14 +48,14 @@ pub fn init(allocator: Allocator, paths: [][:0]const u8) !App {
     };
 }
 
-pub fn deinit(self: *App) void {
+pub fn deinit(self: App) void {
     self.window.deinit();
     self.renderer.deinit();
     self.allocator.destroy(self.window);
     self.allocator.destroy(self.renderer);
 }
 
-fn waitEvent(self: *App) void {
+fn waitEvent(self: App) void {
     var pfds = [_]std.posix.pollfd{
         .{ .fd = self.window.wl_display_fd, .events = std.os.linux.POLL.IN, .revents = undefined },
         .{ .fd = self.window.pipe_fds[0], .events = std.os.linux.POLL.IN, .revents = undefined },
@@ -98,7 +98,7 @@ fn nextImage(self: *App, step: isize) !void {
 
     if (!self.loading_image) {
         self.loading_image = true;
-        var thread = try std.Thread.spawn(.{}, loadNextImage, .{ self, next_index });
+        var thread = try std.Thread.spawn(.{}, loadNextImage, .{ self.*, next_index });
         thread.detach();
     }
 }

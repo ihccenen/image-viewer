@@ -22,7 +22,7 @@ pub fn setKeymap(self: *Keyboard, keymap: [*:0]const u8) void {
     self.xkb_state = xkb.xkb_state_new(self.xkb_keymap) orelse unreachable;
 }
 
-pub fn deinit(self: *Keyboard) void {
+pub fn deinit(self: Keyboard) void {
     xkb.xkb_keymap_unref(self.xkb_keymap);
     xkb.xkb_state_unref(self.xkb_state);
     xkb.xkb_context_unref(self.xkb_context);

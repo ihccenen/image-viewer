@@ -44,7 +44,7 @@ fn onTimer(sigval: c.union_sigval) callconv(.C) void {
     window.dispatchEvent(&e);
 }
 
-fn setTimer(self: *Window, repeats: bool, pressed: bool) void {
+fn setTimer(self: Window, repeats: bool, pressed: bool) void {
     if (!pressed) {
         const its = c.itimerspec{
             .it_value = c.timespec{
@@ -434,7 +434,7 @@ pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]const u8) !vo
     self.running = true;
 }
 
-pub fn deinit(self: *Window) void {
+pub fn deinit(self: Window) void {
     std.posix.close(self.pipe_fds[0]);
     std.posix.close(self.pipe_fds[1]);
 
@@ -462,7 +462,7 @@ pub fn setTitle(self: Window, title: [:0]const u8) void {
     self.xdg_toplevel.setTitle(title);
 }
 
-pub fn swapBuffers(self: *Window) !void {
+pub fn swapBuffers(self: Window) !void {
     if (self.xdg_configured) {
         if (c.eglSwapBuffers(self.egl_display, self.egl_surface) != c.EGL_TRUE) {
             switch (c.eglGetError()) {
@@ -475,6 +475,6 @@ pub fn swapBuffers(self: *Window) !void {
     }
 }
 
-pub fn shouldClose(self: *Window) bool {
+pub fn shouldClose(self: Window) bool {
     return !self.running;
 }

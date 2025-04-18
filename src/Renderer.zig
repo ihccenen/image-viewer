@@ -106,7 +106,7 @@ pub fn init() !Renderer {
     };
 }
 
-pub fn deinit(self: *Renderer) void {
+pub fn deinit(self: Renderer) void {
     self.shader.deinit();
     gl.glDeleteVertexArrays(1, &self.vao);
     gl.glDeleteBuffers(2, @ptrCast(&.{ self.vbo, self.ebo }));
