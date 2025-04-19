@@ -7,16 +7,6 @@ const Event = Window.Event;
 const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
 
-fn loadNextImage(app: App, next_image_index: usize) void {
-    const event = Event{
-        .image = .{
-            .index = next_image_index,
-            .image = Image.init(app.paths[next_image_index]) catch unreachable,
-        },
-    };
-    _ = std.posix.write(app.window.pipe_fds[1], std.mem.asBytes(&event)) catch unreachable;
-}
-
 window: *Window,
 renderer: *Renderer,
 paths: [][:0]const u8,
@@ -87,8 +77,18 @@ fn waitEvent(self: App) void {
     _ = self.window.wl_display.dispatchPending();
 }
 
-fn nextImage(self: *App, step: isize) !void {
-    const next_index = @min(
+fn loadImage(app: App, new_index: usize) void {
+    const event = Event{
+        .image = .{
+            .index = new_index,
+            .image = Image.init(app.paths[new_index]) catch unreachable,
+        },
+    };
+    _ = std.posix.write(app.window.pipe_fds[1], std.mem.asBytes(&event)) catch unreachable;
+}
+
+fn navigate(self: *App, step: isize) !void {
+    const new_index = @min(
         self.paths.len - 1,
         if (step < 0)
             self.index -| @as(usize, @abs(step))
@@ -98,7 +98,7 @@ fn nextImage(self: *App, step: isize) !void {
 
     if (!self.loading_image) {
         self.loading_image = true;
-        var thread = try std.Thread.spawn(.{}, loadNextImage, .{ self.*, next_index });
+        var thread = try std.Thread.spawn(.{}, loadImage, .{ self.*, new_index });
         thread.detach();
     }
 }
@@ -135,17 +135,17 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
     } else if (std.mem.orderZ(u8, &buf, "m") == .eq) {
         self.renderer.move(.center, 0.0);
     } else if (std.mem.orderZ(u8, &buf, "n") == .eq) {
-        try self.nextImage(1);
+        try self.navigate(1);
     } else if (std.mem.orderZ(u8, &buf, "p") == .eq) {
-        try self.nextImage(-1);
+        try self.navigate(-1);
     }
 }
 
 fn pointerPressedHandler(self: *App, button: u32) !void {
     switch (button) {
         274 => self.window.running = false,
-        275 => try self.nextImage(-1),
-        276 => try self.nextImage(1),
+        275 => try self.navigate(-1),
+        276 => try self.navigate(1),
         else => {},
     }
 }
