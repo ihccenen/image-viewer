@@ -224,7 +224,6 @@ pub fn setZoom(self: *Renderer, zoom: Zoom) void {
 const Direction = enum {
     horizontal,
     vertical,
-    center,
 };
 
 pub fn move(self: *Renderer, direction: Direction, step: f32) void {
@@ -238,10 +237,6 @@ pub fn move(self: *Renderer, direction: Direction, step: f32) void {
             if (self.scale.factor * self.texture.width > self.viewport.width) {
                 self.translate.x = @min(@max(self.translate.x + step, -self.translate.max_x), self.translate.max_x);
             }
-        },
-        .center => {
-            self.translate.y = 0.0;
-            self.translate.x = 0.0;
         },
     }
 
