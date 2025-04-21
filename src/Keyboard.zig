@@ -36,6 +36,10 @@ pub fn getName(_: Keyboard, keysym: xkb.xkb_keycode_t, buf: []u8) void {
     _ = xkb.xkb_keysym_get_name(keysym, @ptrCast(buf), @sizeOf(@TypeOf(buf)));
 }
 
+pub fn isKeyValid(name: [:0]const u8) bool {
+    return xkb.xkb_keysym_from_name(name[0..], xkb.XKB_KEYSYM_NO_FLAGS) != xkb.XKB_KEY_NoSymbol;
+}
+
 pub fn updateKey(self: Keyboard, keycode: xkb.xkb_keycode_t, pressed: bool) void {
     _ = xkb.xkb_state_update_key(self.xkb_state, keycode + keycode_offset, if (pressed) xkb.XKB_KEY_DOWN else xkb.XKB_KEY_UP);
 }

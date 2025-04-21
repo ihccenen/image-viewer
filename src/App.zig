@@ -6,9 +6,11 @@ const Window = @import("Window.zig");
 const Event = Window.Event;
 const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
+const Config = @import("Config.zig");
 
 window: *Window,
 renderer: *Renderer,
+config: *Config,
 paths: [][:0]const u8,
 index: usize,
 loading_image: bool,
@@ -28,9 +30,12 @@ pub fn init(allocator: Allocator, paths: [][:0]const u8) !App {
     renderer.setTexture(image);
     image.deinit();
 
+    const config = try Config.init(allocator);
+
     return .{
         .window = window,
         .renderer = renderer,
+        .config = config,
         .paths = paths,
         .index = 0,
         .loading_image = false,
@@ -114,29 +119,27 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
 
     if (self.loading_image) return;
 
-    if (std.mem.orderZ(u8, &buf, "plus") == .eq) {
+    if (std.mem.orderZ(u8, &buf, self.config.@"zoom-in") == .eq) {
         self.renderer.setZoom(.in);
-    } else if (std.mem.orderZ(u8, &buf, "minus") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.@"zoom-out") == .eq) {
         self.renderer.setZoom(.out);
-    } else if (std.mem.orderZ(u8, &buf, "s") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.@"fit-width") == .eq) {
         self.renderer.setFit(.width);
-    } else if (std.mem.orderZ(u8, &buf, "w") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.@"fit-both") == .eq) {
         self.renderer.setFit(.both);
-    } else if (std.mem.orderZ(u8, &buf, "o") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.reset) == .eq) {
         self.renderer.setFit(.none);
-    } else if (std.mem.orderZ(u8, &buf, "k") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.up) == .eq) {
         self.renderer.move(.vertical, -0.1);
-    } else if (std.mem.orderZ(u8, &buf, "l") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.right) == .eq) {
         self.renderer.move(.horizontal, -0.1);
-    } else if (std.mem.orderZ(u8, &buf, "j") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.down) == .eq) {
         self.renderer.move(.vertical, 0.1);
-    } else if (std.mem.orderZ(u8, &buf, "h") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.left) == .eq) {
         self.renderer.move(.horizontal, 0.1);
-    } else if (std.mem.orderZ(u8, &buf, "m") == .eq) {
-        self.renderer.move(.center, 0.0);
-    } else if (std.mem.orderZ(u8, &buf, "n") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.next) == .eq) {
         try self.navigate(1);
-    } else if (std.mem.orderZ(u8, &buf, "p") == .eq) {
+    } else if (std.mem.orderZ(u8, &buf, self.config.previous) == .eq) {
         try self.navigate(-1);
     }
 }
