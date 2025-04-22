@@ -17,10 +17,10 @@ loading_image: bool,
 allocator: Allocator,
 
 pub fn init(allocator: Allocator, paths: [][:0]const u8) !App {
+    var buf = [_]u8{0} ** std.posix.NAME_MAX;
+    const filename = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, paths.len, std.fs.path.basename(paths[0]) });
+
     var window = try allocator.create(Window);
-    const basename = std.fs.path.basename(paths[0]);
-    const filename = try std.fmt.allocPrintZ(allocator, "{d} of {d} - {s}", .{ 1, paths.len, basename });
-    defer allocator.free(filename);
     try window.init(1280, 720, filename);
 
     var renderer = try allocator.create(Renderer);
@@ -189,9 +189,8 @@ fn readEvents(self: *App) !void {
                 self.renderer.setTexture(image.image);
                 self.renderer.applyFitAndTranslate();
 
-                const basename = std.fs.path.basename(self.paths[self.index]);
-                const filename = try std.fmt.allocPrintZ(self.allocator, "{d} of {d} - {s}", .{ self.index + 1, self.paths.len, basename });
-                defer self.allocator.free(filename);
+                var buf = [_]u8{0} ** std.posix.NAME_MAX;
+                const filename = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, self.paths.len, std.fs.path.basename(self.paths[self.index]) });
 
                 self.window.setTitle(filename);
 
