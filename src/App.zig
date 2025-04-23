@@ -8,46 +8,43 @@ const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
 const Config = @import("Config.zig");
 
-window: *Window,
-renderer: *Renderer,
+window: Window,
+renderer: Renderer,
 config: *Config,
 paths: [][:0]const u8,
 index: usize,
 loading_image: bool,
-allocator: Allocator,
 
-pub fn init(allocator: Allocator, paths: [][:0]const u8) !App {
-    var buf = [_]u8{0} ** std.posix.NAME_MAX;
-    const filename = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, paths.len, std.fs.path.basename(paths[0]) });
-
-    var window = try allocator.create(Window);
-    try window.init(1280, 720, filename);
-
-    var renderer = try allocator.create(Renderer);
-    renderer.* = try Renderer.init();
-
-    var image = try Image.init(paths[0]);
-    renderer.setTexture(image);
-    image.deinit();
-
-    const config = try Config.init(allocator);
-
-    return .{
-        .window = window,
-        .renderer = renderer,
-        .config = config,
+pub fn init(allocator: Allocator, paths: [][:0]const u8) !*App {
+    const app = try allocator.create(App);
+    app.* = .{
+        .window = undefined,
+        .renderer = undefined,
+        .config = try Config.init(allocator),
         .paths = paths,
         .index = 0,
         .loading_image = false,
-        .allocator = allocator,
     };
+
+    var image = try Image.init(paths[0]);
+    defer image.deinit();
+
+    var buf = [_]u8{0} ** std.posix.NAME_MAX;
+    const filename = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, paths.len, std.fs.path.basename(paths[0]) });
+
+    app.window = .{};
+    try app.window.init(1280, 720, filename);
+
+    app.renderer = try Renderer.init();
+    app.renderer.setTexture(image);
+
+    return app;
 }
 
-pub fn deinit(self: App) void {
+pub fn deinit(self: *App, allocator: Allocator) void {
     self.window.deinit();
     self.renderer.deinit();
-    self.allocator.destroy(self.window);
-    self.allocator.destroy(self.renderer);
+    allocator.destroy(self);
 }
 
 fn waitEvent(self: App) void {
