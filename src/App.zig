@@ -10,7 +10,7 @@ const Config = @import("Config.zig");
 
 window: Window,
 renderer: Renderer,
-config: *Config,
+config: Config,
 paths: [][:0]const u8,
 index: usize,
 loading_image: bool,
@@ -44,6 +44,7 @@ pub fn init(allocator: Allocator, paths: [][:0]const u8) !*App {
 pub fn deinit(self: *App, allocator: Allocator) void {
     self.window.deinit();
     self.renderer.deinit();
+    self.config.deinit(allocator);
     allocator.destroy(self);
 }
 
@@ -109,35 +110,29 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
     var buf: [128:0]u8 = undefined;
     self.window.keyboard.getName(keysym, &buf);
 
-    if (std.mem.orderZ(u8, &buf, "q") == .eq) {
+    const cmd = self.config.cmdFromKey(&buf) orelse return;
+
+    if (cmd == .quit) {
         self.window.running = false;
         return;
     }
 
-    if (self.loading_image) return;
+    if (self.loading_image)
+        return;
 
-    if (std.mem.orderZ(u8, &buf, self.config.@"zoom-in") == .eq) {
-        self.renderer.setZoom(.in);
-    } else if (std.mem.orderZ(u8, &buf, self.config.@"zoom-out") == .eq) {
-        self.renderer.setZoom(.out);
-    } else if (std.mem.orderZ(u8, &buf, self.config.@"fit-width") == .eq) {
-        self.renderer.setFit(.width);
-    } else if (std.mem.orderZ(u8, &buf, self.config.@"fit-both") == .eq) {
-        self.renderer.setFit(.both);
-    } else if (std.mem.orderZ(u8, &buf, self.config.reset) == .eq) {
-        self.renderer.setFit(.none);
-    } else if (std.mem.orderZ(u8, &buf, self.config.up) == .eq) {
-        self.renderer.move(.vertical, -0.1);
-    } else if (std.mem.orderZ(u8, &buf, self.config.right) == .eq) {
-        self.renderer.move(.horizontal, -0.1);
-    } else if (std.mem.orderZ(u8, &buf, self.config.down) == .eq) {
-        self.renderer.move(.vertical, 0.1);
-    } else if (std.mem.orderZ(u8, &buf, self.config.left) == .eq) {
-        self.renderer.move(.horizontal, 0.1);
-    } else if (std.mem.orderZ(u8, &buf, self.config.next) == .eq) {
-        try self.navigate(1);
-    } else if (std.mem.orderZ(u8, &buf, self.config.previous) == .eq) {
-        try self.navigate(-1);
+    switch (cmd) {
+        .@"zoom-in" => self.renderer.setZoom(.in),
+        .@"zoom-out" => self.renderer.setZoom(.out),
+        .@"fit-width" => self.renderer.setFit(.width),
+        .@"fit-both" => self.renderer.setFit(.both),
+        .reset => self.renderer.setFit(.none),
+        .up => self.renderer.move(.vertical, -0.1),
+        .right => self.renderer.move(.horizontal, -0.1),
+        .down => self.renderer.move(.vertical, 0.1),
+        .left => self.renderer.move(.horizontal, 0.1),
+        .next => try self.navigate(1),
+        .previous => try self.navigate(-1),
+        else => {},
     }
 }
 
