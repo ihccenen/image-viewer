@@ -14,10 +14,10 @@ const Command = enum {
     @"zoom-out",
     @"fit-both",
     @"fit-width",
-    reset,
-    quit,
+    @"fit-none",
     next,
     previous,
+    quit,
 };
 
 const Keybindings = std.StringHashMapUnmanaged(Command);
@@ -30,12 +30,12 @@ fn setDefaults(allocator: Allocator, keybindings: *Keybindings) !void {
         .{ "l", .right },
         .{ "plus", .@"zoom-in" },
         .{ "minus", .@"zoom-out" },
-        .{ "w", .@"fit-both" },
+        .{ "a", .@"fit-both" },
         .{ "s", .@"fit-width" },
-        .{ "o", .reset },
-        .{ "q", .quit },
+        .{ "d", .@"fit-none" },
         .{ "n", .next },
         .{ "p", .previous },
+        .{ "q", .quit },
     };
 
     for (defaults) |default| {

@@ -121,15 +121,15 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
         return;
 
     switch (cmd) {
+        .left => self.renderer.move(.horizontal, 0.1),
+        .down => self.renderer.move(.vertical, 0.1),
+        .right => self.renderer.move(.horizontal, -0.1),
+        .up => self.renderer.move(.vertical, -0.1),
         .@"zoom-in" => self.renderer.setZoom(.in),
         .@"zoom-out" => self.renderer.setZoom(.out),
-        .@"fit-width" => self.renderer.setFit(.width),
         .@"fit-both" => self.renderer.setFit(.both),
-        .reset => self.renderer.setFit(.none),
-        .up => self.renderer.move(.vertical, -0.1),
-        .right => self.renderer.move(.horizontal, -0.1),
-        .down => self.renderer.move(.vertical, 0.1),
-        .left => self.renderer.move(.horizontal, 0.1),
+        .@"fit-width" => self.renderer.setFit(.width),
+        .@"fit-none" => self.renderer.setFit(.none),
         .next => try self.navigate(1),
         .previous => try self.navigate(-1),
         else => {},
