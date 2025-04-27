@@ -148,12 +148,7 @@ fn pointerPressedHandler(self: *App, button: u32) !void {
 fn readEvents(self: *App) !void {
     var event: Event = undefined;
 
-    while (true) {
-        const n = std.posix.read(self.window.pipe_fds[0], std.mem.asBytes(&event)) catch |e| switch (e) {
-            error.WouldBlock => break,
-            else => unreachable,
-        };
-
+    while (std.posix.read(self.window.pipe_fds[0], std.mem.asBytes(&event))) |n| {
         if (n == 0) break;
 
         switch (event) {
@@ -189,6 +184,9 @@ fn readEvents(self: *App) !void {
                 self.loading_image = false;
             },
         }
+    } else |err| switch (err) {
+        error.WouldBlock => return,
+        else => return err,
     }
 }
 
