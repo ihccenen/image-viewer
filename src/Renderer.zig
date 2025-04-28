@@ -42,8 +42,8 @@ translate: struct {
 },
 
 fit: Fit,
-
-need_redraw: bool = false,
+zoom: bool,
+need_redraw: bool,
 
 pub fn init() !Renderer {
     const vertices = [_]f32{
@@ -102,6 +102,7 @@ pub fn init() !Renderer {
         .scale = .{ .factor = 0, .width = 1, .height = 1 },
         .translate = .{ .max_x = 0, .x = 0, .max_y = 0, .y = 0 },
         .fit = .both,
+        .zoom = false,
         .need_redraw = false,
     };
 }
@@ -139,7 +140,7 @@ pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
     self.viewport.width = @floatFromInt(width);
     self.viewport.height = @floatFromInt(height);
 
-    if (self.scale.factor <= 0 or self.fit == .both) {
+    if (!self.zoom and self.fit == .both) {
         self.scale.factor = @min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height);
     }
 
@@ -188,13 +189,17 @@ pub fn setTexture(self: *Renderer, image: Image) void {
         }
     }
 
+    self.zoom = false;
     self.need_redraw = true;
 }
 
 pub fn setFit(self: *Renderer, fit: Fit) void {
     self.fit = fit;
-
+    self.zoom = false;
     self.applyFitAndTranslate();
+    self.need_redraw = true;
+}
+
 
     self.need_redraw = true;
 }
@@ -205,13 +210,12 @@ pub const Zoom = enum {
 };
 
 pub fn setZoom(self: *Renderer, zoom: Zoom) void {
+    self.zoom = true;
     self.scale.factor = switch (zoom) {
         .in => @max(self.scale.factor * @sqrt(2.0), 1.0 / 1024.0),
         .out => @min(self.scale.factor / @sqrt(2.0), 1024.0),
     };
-
     self.updateScaleAndTranslateMax();
-
     self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
     self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
 
