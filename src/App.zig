@@ -177,7 +177,7 @@ fn readEvents(self: *App) !void {
                 self.renderer.applyFitAndTranslate();
 
                 var buf = [_]u8{0} ** std.posix.NAME_MAX;
-                const filename = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, self.paths.len, std.fs.path.basename(self.paths[self.index]) });
+                const filename = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ self.index + 1, self.paths.len, std.fs.path.basename(self.paths[self.index]) });
 
                 self.window.setTitle(filename);
 
