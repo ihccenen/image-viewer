@@ -1,5 +1,6 @@
 pub const Renderer = @This();
 
+const std = @import("std");
 const gl = @import("gl.zig");
 const Shader = @import("Shader.zig");
 const Image = @import("Image.zig");
@@ -41,11 +42,12 @@ translate: struct {
     y: f32,
 },
 
+rotate: i32,
 fit: Fit,
 zoom: bool,
 need_redraw: bool,
 
-pub fn init() !Renderer {
+pub fn init(width: f32, height: f32) !Renderer {
     const vertices = [_]f32{
         1.0, 1.0, 0.0, 1.0, 1.0, // top right
         1.0, -1.0, 0.0, 1.0, 0.0, // bottom right
@@ -91,16 +93,18 @@ pub fn init() !Renderer {
     const shader = try Shader.init();
     shader.use();
     shader.setInt("texture1", 0);
+    shader.setMat4("rotate", Mat4.rotateZ(0));
 
     return .{
         .shader = shader,
         .vao = vao,
         .vbo = vbo,
         .ebo = ebo,
-        .viewport = .{ .width = 0, .height = 0 },
+        .viewport = .{ .width = width, .height = height },
         .texture = .{ .id = texture, .width = 0, .height = 0 },
         .scale = .{ .factor = 0, .width = 1, .height = 1 },
         .translate = .{ .max_x = 0, .x = 0, .max_y = 0, .y = 0 },
+        .rotate = 0,
         .fit = .both,
         .zoom = false,
         .need_redraw = false,
@@ -113,46 +117,47 @@ pub fn deinit(self: Renderer) void {
     gl.glDeleteBuffers(2, @ptrCast(&.{ self.vbo, self.ebo }));
 }
 
-fn updateScaleAndTranslateMax(self: *Renderer) void {
-    self.scale.width = self.scale.factor * (self.texture.width / self.viewport.width);
-    self.scale.height = self.scale.factor * (self.texture.height / self.viewport.height);
-    self.translate.max_x = @max((self.scale.factor * self.texture.width - self.viewport.width) / (self.scale.factor * self.texture.width), 0);
-    self.translate.max_y = @max((self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height), 0);
-}
+fn setTransformations(self: *Renderer, update_scale_factor: bool) void {
+    if (self.rotate == 0 or self.rotate == 180) {
+        if (update_scale_factor) {
+            self.scale.factor = switch (self.fit) {
+                .width => self.viewport.width / self.texture.width,
+                .both => @min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height),
+                .none => 1.0,
+            };
+        }
 
-pub fn applyFitAndTranslate(self: *Renderer) void {
-    self.scale.factor = switch (self.fit) {
-        .width => self.viewport.width / self.texture.width,
-        .both => @min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height),
-        .none => 1.0,
-    };
+        self.scale.width = self.scale.factor * (self.texture.width / self.viewport.width);
+        self.scale.height = self.scale.factor * (self.texture.height / self.viewport.height);
+        self.translate.max_x = @max((self.scale.factor * self.texture.width - self.viewport.width) / (self.scale.factor * self.texture.width), 0);
+        self.translate.max_y = @max((self.scale.factor * self.texture.height - self.viewport.height) / (self.scale.factor * self.texture.height), 0);
+    } else {
+        if (update_scale_factor) {
+            self.scale.factor = switch (self.fit) {
+                .width => self.viewport.width / self.texture.height,
+                .both => @min(self.viewport.width / self.texture.height, self.viewport.height / self.texture.width),
+                .none => 1.0,
+            };
+        }
 
-    self.updateScaleAndTranslateMax();
-
-    self.translate.x = self.translate.max_x;
-    self.translate.y = -self.translate.max_y;
-
-    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
-    self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
+        self.scale.width = self.scale.factor * (self.texture.width / self.viewport.height);
+        self.scale.height = self.scale.factor * (self.texture.height / self.viewport.width);
+        self.translate.max_x = @max((self.scale.factor * self.texture.width - self.viewport.height) / (self.scale.factor * self.texture.width), 0);
+        self.translate.max_y = @max((self.scale.factor * self.texture.height - self.viewport.width) / (self.scale.factor * self.texture.height), 0);
+    }
 }
 
 pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
+    gl.glViewport(0, 0, width, height);
+
     self.viewport.width = @floatFromInt(width);
     self.viewport.height = @floatFromInt(height);
-
-    if (!self.zoom and self.fit == .both) {
-        self.scale.factor = @min(self.viewport.width / self.texture.width, self.viewport.height / self.texture.height);
-    }
-
-    gl.glViewport(0, 0, @intFromFloat(self.viewport.width), @intFromFloat(self.viewport.height));
-
-    self.updateScaleAndTranslateMax();
-
+    self.setTransformations(!self.zoom and self.fit == .both);
     self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
     self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
 
-    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
     self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
+    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
 
     self.need_redraw = true;
 }
@@ -190,16 +195,58 @@ pub fn setTexture(self: *Renderer, image: Image) void {
     }
 
     self.zoom = false;
+    self.setTransformations(!self.zoom);
+
+    switch (self.rotate) {
+        0 => {
+            self.translate.x = self.translate.max_x;
+            self.translate.y = -self.translate.max_y;
+        },
+        90 => {
+            self.translate.x = self.translate.max_x;
+            self.translate.y = self.translate.max_y;
+        },
+        180 => {
+            self.translate.x = -self.translate.max_x;
+            self.translate.y = self.translate.max_y;
+        },
+        270 => {
+            self.translate.x = -self.translate.max_x;
+            self.translate.y = -self.translate.max_y;
+        },
+        else => {},
+    }
+
+    self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
+    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
+    self.shader.setMat4("rotate", Mat4.rotateZ(std.math.degreesToRadians(@as(f32, @floatFromInt(self.rotate)))));
+
     self.need_redraw = true;
 }
 
 pub fn setFit(self: *Renderer, fit: Fit) void {
     self.fit = fit;
     self.zoom = false;
-    self.applyFitAndTranslate();
+    self.setTransformations(!self.zoom);
+    self.translate.x = self.translate.max_x;
+    self.translate.y = -self.translate.max_y;
+
+    self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
+    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
+    self.shader.setMat4("rotate", Mat4.rotateZ(std.math.degreesToRadians(@as(f32, @floatFromInt(self.rotate)))));
+
     self.need_redraw = true;
 }
 
+pub fn rotateTexture(self: *Renderer, angle: i32) void {
+    self.rotate = @mod(self.rotate + angle, 360);
+    self.setTransformations(!self.zoom);
+    self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
+    self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
+
+    self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
+    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
+    self.shader.setMat4("rotate", Mat4.rotateZ(std.math.degreesToRadians(@as(f32, @floatFromInt(self.rotate)))));
 
     self.need_redraw = true;
 }
@@ -210,17 +257,17 @@ pub const Zoom = enum {
 };
 
 pub fn setZoom(self: *Renderer, zoom: Zoom) void {
-    self.zoom = true;
     self.scale.factor = switch (zoom) {
         .in => @max(self.scale.factor * @sqrt(2.0), 1.0 / 1024.0),
         .out => @min(self.scale.factor / @sqrt(2.0), 1024.0),
     };
-    self.updateScaleAndTranslateMax();
+    self.zoom = true;
+    self.setTransformations(!self.zoom);
     self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
     self.translate.y = @min(@max(self.translate.y, -self.translate.max_y), self.translate.max_y);
 
-    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
     self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));
+    self.shader.setMat4("scale", Mat4.scale(.{ self.scale.width, self.scale.height, 0.0 }));
 
     self.need_redraw = true;
 }
@@ -231,17 +278,24 @@ const Direction = enum {
 };
 
 pub fn move(self: *Renderer, direction: Direction, step: f32) void {
-    switch (direction) {
-        .vertical => {
-            if (self.scale.factor * self.texture.height > self.viewport.height) {
-                self.translate.y = @min(@max(self.translate.y + step, -self.translate.max_y), self.translate.max_y);
-            }
+    switch (self.rotate) {
+        0 => switch (direction) {
+            .horizontal => self.translate.x = @min(@max(self.translate.x + step, -self.translate.max_x), self.translate.max_x),
+            .vertical => self.translate.y = @min(@max(self.translate.y + step, -self.translate.max_y), self.translate.max_y),
         },
-        .horizontal => {
-            if (self.scale.factor * self.texture.width > self.viewport.width) {
-                self.translate.x = @min(@max(self.translate.x + step, -self.translate.max_x), self.translate.max_x);
-            }
+        90 => switch (direction) {
+            .horizontal => self.translate.y = @min(@max(self.translate.y + step, -self.translate.max_y), self.translate.max_y),
+            .vertical => self.translate.x = @min(@max(self.translate.x - step, -self.translate.max_x), self.translate.max_x),
         },
+        180 => switch (direction) {
+            .horizontal => self.translate.x = @min(@max(self.translate.x - step, -self.translate.max_x), self.translate.max_x),
+            .vertical => self.translate.y = @min(@max(self.translate.y - step, -self.translate.max_y), self.translate.max_y),
+        },
+        270 => switch (direction) {
+            .horizontal => self.translate.y = @min(@max(self.translate.y - step, -self.translate.max_y), self.translate.max_y),
+            .vertical => self.translate.x = @min(@max(self.translate.x + step, -self.translate.max_x), self.translate.max_x),
+        },
+        else => return,
     }
 
     self.shader.setMat4("translate", Mat4.translate(.{ self.translate.x, self.translate.y, 0.0 }));

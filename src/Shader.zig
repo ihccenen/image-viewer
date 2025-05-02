@@ -11,11 +11,12 @@ const vertex =
     \\
     \\ out vec2 TexCoord;
     \\ uniform mat4 scale;
+    \\ uniform mat4 rotate;
     \\ uniform mat4 translate;
     \\
     \\ void main()
     \\ {
-    \\     gl_Position = scale * translate * vec4(vPos, 1.0);
+    \\     gl_Position = rotate * scale * translate * vec4(vPos, 1.0);
     \\     TexCoord = vTexCoord;
     \\ }
 ;

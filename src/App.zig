@@ -35,7 +35,7 @@ pub fn init(allocator: Allocator, paths: [][:0]const u8) !*App {
     app.window = .{};
     try app.window.init(1280, 720, filename);
 
-    app.renderer = try Renderer.init();
+    app.renderer = try Renderer.init(1280, 720);
     app.renderer.setTexture(image);
 
     return app;
@@ -130,6 +130,8 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
         .@"fit-both" => self.renderer.setFit(.both),
         .@"fit-width" => self.renderer.setFit(.width),
         .@"fit-none" => self.renderer.setFit(.none),
+        .rotate_clockwise => self.renderer.rotateTexture(90),
+        .rotate_counterclockwise => self.renderer.rotateTexture(-90),
         .next => try self.navigate(1),
         .previous => try self.navigate(-1),
         else => {},
@@ -174,7 +176,6 @@ fn readEvents(self: *App) !void {
                 defer image.image.deinit();
                 self.index = image.index;
                 self.renderer.setTexture(image.image);
-                self.renderer.applyFitAndTranslate();
 
                 var buf = [_]u8{0} ** std.posix.NAME_MAX;
                 const filename = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ self.index + 1, self.paths.len, std.fs.path.basename(self.paths[self.index]) });

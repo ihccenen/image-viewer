@@ -43,6 +43,19 @@ pub const Mat4 = struct {
         };
     }
 
+    pub fn rotateZ(angle: f32) Mat4 {
+        const sin, const cos = sincos(angle);
+
+        return .{
+            .data = .{
+                .{ cos, -sin, 0, 0 },
+                .{ sin, cos, 0, 0 },
+                .{ 0, 0, 1, 0 },
+                .{ 0, 0, 0, 1 },
+            },
+        };
+    }
+
     pub fn orthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) Mat4 {
         const r = 1 / (near - far);
         return .{
