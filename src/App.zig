@@ -99,7 +99,7 @@ fn navigate(self: *App, step: isize) !void {
             self.index +| @as(usize, @intCast(step)),
     );
 
-    if (!self.loading_image) {
+    if (new_index != self.index and !self.loading_image) {
         self.loading_image = true;
         var thread = try std.Thread.spawn(.{}, loadImage, .{ self.*, new_index });
         thread.detach();
