@@ -20,7 +20,7 @@ pub fn init(path: [:0]const u8) !Image {
 
     errdefer stbi.stbi_image_free(data);
 
-    if (width < 0) {
+    if (width <= 0) {
         return error.InvalidImageWidth;
     }
 

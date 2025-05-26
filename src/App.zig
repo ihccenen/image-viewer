@@ -186,15 +186,14 @@ fn readWindowEvents(self: *App) !void {
     }
 }
 
-fn removePath(self: *App, wd: i32) void {
+fn removePath(self: *App, wd: i32, step: i32) void {
     if (self.wds.fetchRemove(wd)) |kv| {
         const path = kv.value;
         const index = self.getPathIndex(path) orelse unreachable;
         _ = self.path_list.orderedRemove(index);
 
-        if (index <= self.index) {
-            self.index -= 1;
-        }
+        if (index < self.index or (index == self.index and self.index == 0))
+            self.index += step;
     }
 }
 
@@ -208,10 +207,10 @@ fn readInotifyEvents(self: *App) !void {
             const inotify_event = @as(*std.os.linux.inotify_event, @ptrCast(&buf));
 
             if (inotify_event.mask & std.os.linux.IN.DELETE_SELF != 0) {
-                self.removePath(inotify_event.wd);
+                self.removePath(inotify_event.wd, -1);
             } else if (inotify_event.mask & std.os.linux.IN.MOVE_SELF != 0) {
                 std.posix.inotify_rm_watch(self.inotify_fd, inotify_event.wd);
-                self.removePath(inotify_event.wd);
+                self.removePath(inotify_event.wd, -1);
             }
         } else |err| switch (err) {
             error.WouldBlock => break,
