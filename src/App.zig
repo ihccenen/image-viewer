@@ -11,29 +11,42 @@ const Config = @import("Config.zig");
 window: Window,
 renderer: Renderer,
 config: Config,
-paths: [][:0]const u8,
-index: usize,
+path_list: std.ArrayListUnmanaged([:0]const u8),
+index: i32,
 loading_image: bool,
+inotify_fd: i32,
+wds: std.AutoHashMapUnmanaged(i32, [:0]const u8),
 
-pub fn init(allocator: Allocator, paths: [][:0]const u8) !*App {
+pub fn init(allocator: Allocator, path_list: std.ArrayListUnmanaged([:0]const u8)) !*App {
     const app = try allocator.create(App);
+    const fd = try std.posix.inotify_init1(std.os.linux.IN.NONBLOCK);
+    var wds: std.AutoHashMapUnmanaged(i32, [:0]const u8) = .empty;
+
+    for (path_list.items) |path| {
+        const wd = try std.posix.inotify_add_watch(fd, path, std.os.linux.IN.DELETE_SELF | std.os.linux.IN.MOVE_SELF);
+
+        try wds.put(allocator, wd, path[0..]);
+    }
+
     app.* = .{
         .window = undefined,
         .renderer = undefined,
         .config = try Config.init(allocator),
-        .paths = paths,
+        .path_list = path_list,
         .index = 0,
         .loading_image = false,
+        .inotify_fd = fd,
+        .wds = wds,
     };
 
-    var image = try Image.init(paths[0]);
+    var image = try Image.init(path_list.items[0]);
     defer image.deinit();
 
     var buf = [_]u8{0} ** std.posix.NAME_MAX;
-    const filename = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, paths.len, std.fs.path.basename(paths[0]) });
+    const title = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, path_list.items.len, std.fs.path.basename(path_list.items[0]) });
 
     app.window = .{};
-    try app.window.init(1280, 720, filename);
+    try app.window.init(1280, 720, title);
 
     app.renderer = try Renderer.init(1280, 720);
     app.renderer.setTexture(image);
@@ -45,61 +58,33 @@ pub fn deinit(self: *App, allocator: Allocator) void {
     self.window.deinit();
     self.renderer.deinit();
     self.config.deinit(allocator);
+
+    var iter = self.wds.keyIterator();
+
+    while (iter.next()) |wd| {
+        std.posix.inotify_rm_watch(self.inotify_fd, wd.*);
+    }
+
+    self.wds.deinit(allocator);
+
+    std.posix.close(self.inotify_fd);
     allocator.destroy(self);
 }
 
-fn waitEvent(self: App) void {
-    var pfds = [_]std.posix.pollfd{
-        .{ .fd = self.window.wl_display_fd, .events = std.os.linux.POLL.IN, .revents = undefined },
-        .{ .fd = self.window.pipe_fds[0], .events = std.os.linux.POLL.IN, .revents = undefined },
-    };
-
-    while (!self.window.wl_display.prepareRead()) {
-        if (self.window.wl_display.dispatchPending() != .SUCCESS) {
-            return;
-        }
-    }
-
-    if (self.window.wl_display.flush() != .SUCCESS) {
-        return;
-    }
-
-    _ = std.posix.poll(&pfds, -1) catch {
-        self.window.wl_display.cancelRead();
-        return;
-    };
-
-    if (pfds[0].revents != 0 & std.os.linux.POLL.IN) {
-        if (self.window.wl_display.readEvents() != .SUCCESS) {
-            return;
-        }
-    } else {
-        self.window.wl_display.cancelRead();
-    }
-
-    _ = self.window.wl_display.dispatchPending();
-}
-
-fn loadImage(app: App, new_index: usize) void {
+fn loadImage(app: App, new_index: i32) void {
     const event = Event{
         .image = .{
             .index = new_index,
-            .image = Image.init(app.paths[new_index]) catch unreachable,
+            .image = Image.init(app.path_list.items[@intCast(new_index)]) catch unreachable,
         },
     };
     _ = std.posix.write(app.window.pipe_fds[1], std.mem.asBytes(&event)) catch unreachable;
 }
 
-fn navigate(self: *App, step: isize) !void {
-    const new_index = @min(
-        self.paths.len - 1,
-        if (step < 0)
-            self.index -| @as(usize, @abs(step))
-        else
-            self.index +| @as(usize, @intCast(step)),
-    );
+fn navigate(self: *App, step: i32) !void {
+    const new_index = self.index + step;
 
-    if (new_index != self.index and !self.loading_image) {
+    if (new_index >= 0 and new_index < self.path_list.items.len and new_index != self.index and !self.loading_image) {
         self.loading_image = true;
         var thread = try std.Thread.spawn(.{}, loadImage, .{ self.*, new_index });
         thread.detach();
@@ -147,47 +132,132 @@ fn pointerPressedHandler(self: *App, button: u32) !void {
     }
 }
 
-fn readEvents(self: *App) !void {
-    var event: Event = undefined;
+fn getPathIndex(self: App, path: [:0]const u8) ?usize {
+    for (self.path_list.items, 0..) |item, i| {
+        if (std.mem.orderZ(u8, path, item) == .eq) return i;
+    }
 
-    while (std.posix.read(self.window.pipe_fds[0], std.mem.asBytes(&event))) |n| {
-        if (n == 0) break;
+    return null;
+}
 
-        switch (event) {
-            .keyboard => |keysym| try self.keyboardHandler(keysym),
-            .pointer => |e| if (!self.loading_image) {
-                switch (e) {
-                    .button => |button| try self.pointerPressedHandler(button),
-                    .axis => |axis| self.renderer.move(.vertical, if (axis < 0) -0.1 else 0.1),
-                    .motion => |motion| {
-                        const x = 1 / (self.renderer.scale.factor * self.renderer.texture.width / 2);
-                        const y = 1 / (self.renderer.scale.factor * self.renderer.texture.height / 2);
+fn readWindowEvents(self: *App) !void {
+    while (true) {
+        var event: Event = undefined;
 
-                        self.renderer.move(.horizontal, @as(f32, @floatFromInt(motion.x)) * x);
-                        self.renderer.move(.vertical, @as(f32, @floatFromInt(motion.y)) * -y);
-                    },
-                }
-            },
-            .resize => |dim| {
-                const width, const height = dim;
-                self.renderer.setViewport(width, height);
-            },
-            .image => |image| {
-                defer image.image.deinit();
-                self.index = image.index;
-                self.renderer.setTexture(image.image);
+        while (std.posix.read(self.window.pipe_fds[0], std.mem.asBytes(&event))) |n| {
+            if (n == 0) break;
 
-                var buf = [_]u8{0} ** std.posix.NAME_MAX;
-                const filename = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ self.index + 1, self.paths.len, std.fs.path.basename(self.paths[self.index]) });
+            switch (event) {
+                .keyboard => |keysym| try self.keyboardHandler(keysym),
+                .pointer => |e| if (!self.loading_image) {
+                    switch (e) {
+                        .button => |button| try self.pointerPressedHandler(button),
+                        .axis => |axis| self.renderer.move(.vertical, if (axis < 0) -0.1 else 0.1),
+                        .motion => |motion| {
+                            const x = 1 / (self.renderer.scale.factor * self.renderer.texture.width / 2);
+                            const y = 1 / (self.renderer.scale.factor * self.renderer.texture.height / 2);
 
-                self.window.setTitle(filename);
+                            self.renderer.move(.horizontal, @as(f32, @floatFromInt(motion.x)) * x);
+                            self.renderer.move(.vertical, @as(f32, @floatFromInt(motion.y)) * -y);
+                        },
+                    }
+                },
+                .resize => |dim| {
+                    const width, const height = dim;
+                    self.renderer.setViewport(width, height);
+                },
+                .image => |image| {
+                    defer image.image.deinit();
+                    self.index = image.index;
+                    self.renderer.setTexture(image.image);
 
-                self.loading_image = false;
-            },
+                    var buf = [_]u8{0} ** std.posix.NAME_MAX;
+                    const title = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ self.index + 1, self.path_list.items.len, std.fs.path.basename(self.path_list.items[@intCast(self.index)]) });
+
+                    self.window.setTitle(title);
+
+                    self.loading_image = false;
+                },
+            }
+        } else |err| switch (err) {
+            error.WouldBlock => break,
+            else => return err,
         }
-    } else |err| switch (err) {
-        error.WouldBlock => return,
-        else => return err,
+    }
+}
+
+fn removePath(self: *App, wd: i32) void {
+    if (self.wds.fetchRemove(wd)) |kv| {
+        const path = kv.value;
+        const index = self.getPathIndex(path) orelse unreachable;
+        _ = self.path_list.orderedRemove(index);
+
+        if (index <= self.index) {
+            self.index -= 1;
+        }
+    }
+}
+
+fn readInotifyEvents(self: *App) !void {
+    while (true) {
+        var buf: [4096]u8 align(@alignOf(std.os.linux.inotify_event)) = undefined;
+
+        while (std.posix.read(self.inotify_fd, &buf)) |n| {
+            if (n == 0) break;
+
+            const inotify_event = @as(*std.os.linux.inotify_event, @ptrCast(&buf));
+
+            if (inotify_event.mask & std.os.linux.IN.DELETE_SELF != 0) {
+                self.removePath(inotify_event.wd);
+            } else if (inotify_event.mask & std.os.linux.IN.MOVE_SELF != 0) {
+                std.posix.inotify_rm_watch(self.inotify_fd, inotify_event.wd);
+                self.removePath(inotify_event.wd);
+            }
+        } else |err| switch (err) {
+            error.WouldBlock => break,
+            else => return,
+        }
+    }
+}
+
+fn waitEvent(self: *App) !void {
+    var pfds = [_]std.posix.pollfd{
+        .{ .fd = self.window.wl_display_fd, .events = std.os.linux.POLL.IN, .revents = undefined },
+        .{ .fd = self.window.pipe_fds[0], .events = std.os.linux.POLL.IN, .revents = undefined },
+        .{ .fd = self.inotify_fd, .events = std.os.linux.POLL.IN, .revents = undefined },
+    };
+
+    while (!self.window.wl_display.prepareRead()) {
+        if (self.window.wl_display.dispatchPending() != .SUCCESS) {
+            return;
+        }
+    }
+
+    if (self.window.wl_display.flush() != .SUCCESS) {
+        return;
+    }
+
+    _ = std.posix.poll(&pfds, -1) catch {
+        self.window.wl_display.cancelRead();
+        return;
+    };
+
+    if (pfds[0].revents != 0 & std.os.linux.POLL.IN) {
+        if (self.window.wl_display.readEvents() != .SUCCESS) {
+            return;
+        }
+    } else {
+        self.window.wl_display.cancelRead();
+    }
+
+    _ = self.window.wl_display.dispatchPending();
+
+    if (pfds[1].revents != 0 & std.os.linux.POLL.IN) {
+        try self.readWindowEvents();
+    }
+
+    if (pfds[2].revents != 0 & std.os.linux.POLL.IN) {
+        try self.readInotifyEvents();
     }
 }
 
@@ -198,7 +268,6 @@ pub fn run(self: *App) !void {
             try self.window.swapBuffers();
         }
 
-        self.waitEvent();
-        try self.readEvents();
+        try self.waitEvent();
     }
 }
