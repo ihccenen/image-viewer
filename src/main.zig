@@ -56,7 +56,7 @@ pub fn main() !void {
 
     std.mem.sort([:0]const u8, path_list.items, {}, lessThan);
 
-    var app = try App.init(allocator, path_list);
+    var app = try App.init(allocator, &path_list);
     defer app.deinit(allocator);
     try app.run();
 }

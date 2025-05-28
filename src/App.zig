@@ -11,14 +11,31 @@ const Config = @import("Config.zig");
 window: Window,
 renderer: Renderer,
 config: Config,
-path_list: std.ArrayListUnmanaged([:0]const u8),
+path_list: *std.ArrayListUnmanaged([:0]const u8),
 index: i32,
 loading_image: bool,
 inotify_fd: i32,
 wds: std.AutoHashMapUnmanaged(i32, [:0]const u8),
 
-pub fn init(allocator: Allocator, path_list: std.ArrayListUnmanaged([:0]const u8)) !*App {
+pub fn init(allocator: Allocator, path_list: *std.ArrayListUnmanaged([:0]const u8)) !*App {
     const app = try allocator.create(App);
+    var image: Image = undefined;
+
+    while (true) {
+        image = Image.init(path_list.items[0]) catch |err| {
+            _ = path_list.orderedRemove(0);
+
+            if (path_list.items.len == 0) {
+                return err;
+            } else {
+                continue;
+            }
+        };
+
+        break;
+    }
+    defer image.deinit();
+
     const fd = try std.posix.inotify_init1(std.os.linux.IN.NONBLOCK);
     var wds: std.AutoHashMapUnmanaged(i32, [:0]const u8) = .empty;
 
@@ -38,9 +55,6 @@ pub fn init(allocator: Allocator, path_list: std.ArrayListUnmanaged([:0]const u8
         .inotify_fd = fd,
         .wds = wds,
     };
-
-    var image = try Image.init(path_list.items[0]);
-    defer image.deinit();
 
     var buf = [_]u8{0} ** std.posix.NAME_MAX;
     const title = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, path_list.items.len, std.fs.path.basename(path_list.items[0]) });
@@ -71,13 +85,35 @@ pub fn deinit(self: *App, allocator: Allocator) void {
     allocator.destroy(self);
 }
 
-fn loadImage(app: App, new_index: i32) void {
+fn loadImage(app: *App, new_index: i32, previous: bool) !void {
+    var i = new_index;
+    var image: Image = undefined;
+
+    while (true) {
+        image = Image.init(app.path_list.items[@intCast(i)]) catch {
+            _ = app.path_list.orderedRemove(@intCast(i));
+
+            if (app.path_list.items.len == 0)
+                return;
+
+            i = if (previous)
+                @min(i - 1, 0)
+            else
+                @min(i, @as(i32, @intCast(app.path_list.items.len)) - 1);
+
+            continue;
+        };
+
+        break;
+    }
+
     const event = Event{
         .image = .{
-            .index = new_index,
-            .image = Image.init(app.path_list.items[@intCast(new_index)]) catch unreachable,
+            .index = i,
+            .image = image,
         },
     };
+
     _ = std.posix.write(app.window.pipe_fds[1], std.mem.asBytes(&event)) catch unreachable;
 }
 
@@ -86,8 +122,48 @@ fn navigate(self: *App, step: i32) !void {
 
     if (new_index >= 0 and new_index < self.path_list.items.len and new_index != self.index and !self.loading_image) {
         self.loading_image = true;
-        var thread = try std.Thread.spawn(.{}, loadImage, .{ self.*, new_index });
+        var thread = try std.Thread.spawn(.{}, loadImage, .{ self, new_index, step < 0 });
         thread.detach();
+    }
+}
+
+fn removePathByWd(self: *App, wd: i32, step: i32) void {
+    if (self.wds.fetchRemove(wd)) |kv| {
+        const path = kv.value;
+        const index = self.getPathIndex(path) orelse unreachable;
+        _ = self.path_list.orderedRemove(index);
+
+        if (index < self.index or (index == self.index and self.index == 0))
+            self.index += step;
+    }
+}
+
+fn deleteCurrentImage(self: *App) !void {
+    if (!self.loading_image) {
+        const deleted = self.path_list.items[@intCast(self.index)];
+        var iter = self.wds.iterator();
+
+        while (iter.next()) |entry| {
+            const path = entry.value_ptr.*;
+
+            if (std.mem.orderZ(u8, path, deleted) == .eq) {
+                const wd = entry.key_ptr.*;
+                std.posix.inotify_rm_watch(self.inotify_fd, wd);
+                self.removePathByWd(wd, 0);
+                try std.fs.deleteFileAbsolute(deleted);
+
+                if (self.path_list.items.len == 0) {
+                    self.window.running = false;
+                    return;
+                }
+
+                self.loading_image = true;
+                var thread = try std.Thread.spawn(.{}, loadImage, .{ self, if (self.index >= self.path_list.items.len) @as(i32, @intCast(self.path_list.items.len)) - 1 else self.index, false });
+                thread.detach();
+
+                return;
+            }
+        }
     }
 }
 
@@ -119,6 +195,7 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
         .rotate_counterclockwise => self.renderer.rotateTexture(-90),
         .next => try self.navigate(1),
         .previous => try self.navigate(-1),
+        .delete => try self.deleteCurrentImage(),
         else => {},
     }
 }
@@ -186,17 +263,6 @@ fn readWindowEvents(self: *App) !void {
     }
 }
 
-fn removePath(self: *App, wd: i32, step: i32) void {
-    if (self.wds.fetchRemove(wd)) |kv| {
-        const path = kv.value;
-        const index = self.getPathIndex(path) orelse unreachable;
-        _ = self.path_list.orderedRemove(index);
-
-        if (index < self.index or (index == self.index and self.index == 0))
-            self.index += step;
-    }
-}
-
 fn readInotifyEvents(self: *App) !void {
     while (true) {
         var buf: [4096]u8 align(@alignOf(std.os.linux.inotify_event)) = undefined;
@@ -207,10 +273,10 @@ fn readInotifyEvents(self: *App) !void {
             const inotify_event = @as(*std.os.linux.inotify_event, @ptrCast(&buf));
 
             if (inotify_event.mask & std.os.linux.IN.DELETE_SELF != 0) {
-                self.removePath(inotify_event.wd, -1);
+                self.removePathByWd(inotify_event.wd, -1);
             } else if (inotify_event.mask & std.os.linux.IN.MOVE_SELF != 0) {
                 std.posix.inotify_rm_watch(self.inotify_fd, inotify_event.wd);
-                self.removePath(inotify_event.wd, -1);
+                self.removePathByWd(inotify_event.wd, -1);
             }
         } else |err| switch (err) {
             error.WouldBlock => break,

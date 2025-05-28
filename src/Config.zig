@@ -19,6 +19,7 @@ const Command = enum {
     rotate_counterclockwise,
     next,
     previous,
+    delete,
     quit,
 };
 
@@ -39,6 +40,7 @@ fn setDefaults(allocator: Allocator, keybindings: *Keybindings) !void {
         .{ "R", .rotate_counterclockwise },
         .{ "n", .next },
         .{ "p", .previous },
+        .{ "Delete", .delete },
         .{ "q", .quit },
     };
 
