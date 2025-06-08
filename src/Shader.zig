@@ -32,15 +32,14 @@ const fragment =
     \\ {
     \\    float layerWidth = 1.0 / 2.0;
     \\    float layerHeight = 1.0 / 2.0;
+    \\    int layer = int(floor(TexCoord.y / layerHeight) * 2.0 + floor(TexCoord.x / layerWidth));
     \\
-    \\    int layerX = int(TexCoord.x / layerWidth);
-    \\    int layerY = int(TexCoord.y / layerHeight);
-    \\    int layer = layerY * 2 + layerX;
+    \\    vec2 normalizedTexCoord = vec2(
+    \\        mix(TexCoord.x, TexCoord.x - 0.5, float(layer == 1 || layer == 3)),
+    \\        mix(TexCoord.y, TexCoord.y - 0.5, float(layer == 2 || layer == 3))
+    \\    ) * vec2(2.0);
     \\
-    \\    float adjustedX = (TexCoord.x - float(layerX) * layerWidth) / layerWidth;
-    \\    float adjustedY = (TexCoord.y - float(layerY) * layerHeight) / layerHeight;
-    \\
-    \\    FragColor = texture(texture1, vec3(adjustedX, adjustedY, layer));
+    \\    FragColor = texture(texture1, vec3(normalizedTexCoord, layer));
     \\ }
 ;
 
