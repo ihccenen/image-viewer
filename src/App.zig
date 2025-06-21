@@ -46,7 +46,7 @@ pub fn init(allocator: Allocator, path_list: *std.ArrayListUnmanaged([:0]const u
     }
 
     app.* = .{
-        .window = undefined,
+        .window = .default,
         .renderer = undefined,
         .config = try Config.init(allocator),
         .path_list = path_list,
@@ -59,7 +59,6 @@ pub fn init(allocator: Allocator, path_list: *std.ArrayListUnmanaged([:0]const u
     var buf = [_]u8{0} ** std.posix.NAME_MAX;
     const title = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, path_list.items.len, std.fs.path.basename(path_list.items[0]) });
 
-    app.window = .{};
     try app.window.init(1280, 720, title);
 
     app.renderer = try Renderer.init(1280, 720);

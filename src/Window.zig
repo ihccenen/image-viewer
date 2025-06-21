@@ -211,7 +211,7 @@ fn seatListener(_: *wl.Seat, event: wl.Seat.Event, window: *Window) void {
 fn wmBaseListener(_: *xdg.WmBase, event: xdg.WmBase.Event, window: *Window) void {
     switch (event) {
         .ping => |ping| {
-            window.wm_base.pong(ping.serial);
+            window.xdg_wm_base.pong(ping.serial);
         },
     }
 }
@@ -227,8 +227,8 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, window: *W
                 window.wl_seat = registry.bind(global.name, wl.Seat, 9) catch return;
                 window.wl_seat.setListener(*Window, seatListener, window);
             } else if (mem.orderZ(u8, global.interface, xdg.WmBase.interface.name) == .eq) {
-                window.wm_base = registry.bind(global.name, xdg.WmBase, 1) catch return;
-                window.wm_base.setListener(*Window, wmBaseListener, window);
+                window.xdg_wm_base = registry.bind(global.name, xdg.WmBase, 1) catch return;
+                window.xdg_wm_base.setListener(*Window, wmBaseListener, window);
             }
         },
         .global_remove => {},
@@ -268,30 +268,30 @@ fn setNonBlock(fd: std.posix.fd_t) void {
     _ = std.posix.fcntl(fd, std.posix.F.SETFL, flags) catch unreachable;
 }
 
-wl_display: *wl.Display = undefined,
-wl_registry: *wl.Registry = undefined,
-wl_shm: *wl.Shm = undefined,
-wl_compositor: *wl.Compositor = undefined,
-wl_surface: *wl.Surface = undefined,
-wl_seat: *wl.Seat = undefined,
-wl_keyboard: *wl.Keyboard = undefined,
-wl_pointer: *wl.Pointer = undefined,
+wl_display: *wl.Display,
+wl_registry: *wl.Registry,
+wl_shm: *wl.Shm,
+wl_compositor: *wl.Compositor,
+wl_surface: *wl.Surface,
+wl_seat: *wl.Seat,
+wl_keyboard: *wl.Keyboard,
+wl_pointer: *wl.Pointer,
 
-wl_cursor_surface: *wl.Surface = undefined,
-wl_cursor_image: *wl.CursorImage = undefined,
+wl_cursor_surface: *wl.Surface,
+wl_cursor_image: *wl.CursorImage,
 
-wm_base: *xdg.WmBase = undefined,
-xdg_surface: *xdg.Surface = undefined,
-xdg_toplevel: *xdg.Toplevel = undefined,
-xdg_configured: bool = false,
+xdg_wm_base: *xdg.WmBase,
+xdg_surface: *xdg.Surface,
+xdg_toplevel: *xdg.Toplevel,
+xdg_configured: bool,
 
-egl_display: c.EGLDisplay = undefined,
-egl_context: c.EGLContext = undefined,
-egl_surface: c.EGLSurface = undefined,
-egl_window: *wl.EglWindow = undefined,
+egl_display: c.EGLDisplay,
+egl_context: c.EGLContext,
+egl_surface: c.EGLSurface,
+egl_window: *wl.EglWindow,
 
-width: c_int = 0,
-height: c_int = 0,
+width: c_int,
+height: c_int,
 
 pointer: struct {
     right_button_pressed: bool,
@@ -299,18 +299,50 @@ pointer: struct {
     current_y: i24,
     last_x: i24,
     last_y: i24,
-} = undefined,
+},
 
-keyboard: Keyboard = undefined,
-repeat_key: u32 = 0,
-repeat_delay: i32 = 400,
-repeat_interval: i32 = 80,
+keyboard: Keyboard,
+repeat_key: u32,
+repeat_delay: i32,
+repeat_interval: i32,
 
-wl_display_fd: std.posix.fd_t = undefined,
-pipe_fds: [2]std.posix.fd_t = undefined,
-timer_id: c.timer_t = undefined,
+wl_display_fd: std.posix.fd_t,
+pipe_fds: [2]std.posix.fd_t,
+timer_id: c.timer_t,
 
-running: bool = false,
+running: bool,
+
+pub const default: Window = .{
+    .wl_display = undefined,
+    .wl_registry = undefined,
+    .wl_shm = undefined,
+    .wl_compositor = undefined,
+    .wl_surface = undefined,
+    .wl_seat = undefined,
+    .wl_keyboard = undefined,
+    .wl_pointer = undefined,
+    .wl_cursor_surface = undefined,
+    .wl_cursor_image = undefined,
+    .xdg_wm_base = undefined,
+    .xdg_surface = undefined,
+    .xdg_toplevel = undefined,
+    .xdg_configured = undefined,
+    .egl_display = undefined,
+    .egl_context = undefined,
+    .egl_surface = undefined,
+    .egl_window = undefined,
+    .width = 0,
+    .height = 0,
+    .pointer = undefined,
+    .keyboard = undefined,
+    .repeat_key = undefined,
+    .repeat_delay = undefined,
+    .repeat_interval = undefined,
+    .wl_display_fd = undefined,
+    .pipe_fds = undefined,
+    .timer_id = undefined,
+    .running = undefined,
+};
 
 pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]const u8) !void {
     self.wl_display = try wl.Display.connect(null);
@@ -342,7 +374,7 @@ pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]const u8) !vo
     if (self.wl_display.roundtrip() != .SUCCESS) return error.RoundtripFailed;
 
     self.wl_surface = try self.wl_compositor.createSurface();
-    self.xdg_surface = try self.wm_base.getXdgSurface(self.wl_surface);
+    self.xdg_surface = try self.xdg_wm_base.getXdgSurface(self.wl_surface);
     self.xdg_toplevel = try self.xdg_surface.getToplevel();
 
     self.xdg_surface.setListener(*Window, xdgSurfaceListener, self);
@@ -406,7 +438,7 @@ pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]const u8) !vo
         else => return error.FailedToCreateContext,
     };
 
-    self.egl_window = try wl.EglWindow.create(self.wl_surface, @intCast(width), @intCast(height));
+    self.egl_window = try wl.EglWindow.create(self.wl_surface, width, height);
 
     self.egl_surface = c.eglCreatePlatformWindowSurface(self.egl_display, egl_config, @ptrCast(self.egl_window), null) orelse switch (c.eglGetError()) {
         c.EGL_BAD_MATCH => return error.MismatchedConfig,
