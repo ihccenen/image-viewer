@@ -18,8 +18,7 @@ fn isSupported(path: [:0]const u8) bool {
 
 fn appendImagesPaths(allocator: Allocator, path_list: *std.ArrayListUnmanaged([:0]const u8), path: [:0]const u8) !void {
     if (isSupported(path)) {
-        try path_list.append(allocator, path);
-        return;
+        path_list.append(allocator, path) catch return;
     }
 
     var walker = try (std.fs.cwd().openDir(path, .{ .iterate = true }) catch return).walk(allocator);
@@ -27,12 +26,9 @@ fn appendImagesPaths(allocator: Allocator, path_list: *std.ArrayListUnmanaged([:
 
     while (try walker.next()) |entry| {
         switch (entry.kind) {
-            .file => if (isSupported(entry.basename))
-                try path_list.append(
-                    allocator,
-                    try std.fs.path.joinZ(allocator, &.{ path, entry.path }),
-                ),
-
+            .file => if (isSupported(entry.basename)) {
+                try path_list.append(allocator, try std.fs.path.joinZ(allocator, &.{ path, entry.path }));
+            },
             else => {},
         }
     }
