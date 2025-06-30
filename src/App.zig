@@ -4,12 +4,10 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Window = @import("Window.zig");
 const Event = Window.Event;
-const Renderer = @import("Renderer.zig");
 const Image = @import("Image.zig");
 const Config = @import("Config.zig");
 
 window: Window,
-renderer: Renderer,
 config: Config,
 path_list: *std.ArrayListUnmanaged([:0]const u8),
 index: i32,
@@ -47,7 +45,6 @@ pub fn init(allocator: Allocator, path_list: *std.ArrayListUnmanaged([:0]const u
 
     app.* = .{
         .window = .default,
-        .renderer = undefined,
         .config = try Config.init(allocator),
         .path_list = path_list,
         .index = 0,
@@ -59,17 +56,13 @@ pub fn init(allocator: Allocator, path_list: *std.ArrayListUnmanaged([:0]const u
     var buf = [_]u8{0} ** std.posix.NAME_MAX;
     const title = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ 1, path_list.items.len, std.fs.path.basename(path_list.items[0]) });
 
-    try app.window.init(1280, 720, title);
-
-    app.renderer = try Renderer.init(1280, 720);
-    app.renderer.setTexture(image);
+    try app.window.init(1280, 720, image, title);
 
     return app;
 }
 
 pub fn deinit(self: *App, allocator: Allocator) void {
     self.window.deinit();
-    self.renderer.deinit();
     self.config.deinit(allocator);
 
     var iter = self.wds.keyIterator();
@@ -181,17 +174,17 @@ fn keyboardHandler(self: *App, keysym: u32) !void {
         return;
 
     switch (cmd) {
-        .left => self.renderer.move(.horizontal, 0.1),
-        .down => self.renderer.move(.vertical, 0.1),
-        .right => self.renderer.move(.horizontal, -0.1),
-        .up => self.renderer.move(.vertical, -0.1),
-        .@"zoom-in" => self.renderer.setZoom(.in),
-        .@"zoom-out" => self.renderer.setZoom(.out),
-        .@"fit-both" => self.renderer.setFit(.both),
-        .@"fit-width" => self.renderer.setFit(.width),
-        .@"fit-none" => self.renderer.setFit(.none),
-        .rotate_clockwise => self.renderer.rotateTexture(90),
-        .rotate_counterclockwise => self.renderer.rotateTexture(-90),
+        .left => self.window.renderer.move(.horizontal, 0.1),
+        .down => self.window.renderer.move(.vertical, 0.1),
+        .right => self.window.renderer.move(.horizontal, -0.1),
+        .up => self.window.renderer.move(.vertical, -0.1),
+        .@"zoom-in" => self.window.renderer.setZoom(.in),
+        .@"zoom-out" => self.window.renderer.setZoom(.out),
+        .@"fit-both" => self.window.renderer.setFit(.both),
+        .@"fit-width" => self.window.renderer.setFit(.width),
+        .@"fit-none" => self.window.renderer.setFit(.none),
+        .rotate_clockwise => self.window.renderer.rotateTexture(90),
+        .rotate_counterclockwise => self.window.renderer.rotateTexture(-90),
         .next => try self.navigate(1),
         .previous => try self.navigate(-1),
         .delete => try self.deleteCurrentImage(),
@@ -228,24 +221,24 @@ fn readWindowEvents(self: *App) !void {
                 .pointer => |e| if (!self.loading_image) {
                     switch (e) {
                         .button => |button| try self.pointerPressedHandler(button),
-                        .axis => |axis| self.renderer.move(.vertical, if (axis < 0) -0.1 else 0.1),
+                        .axis => |axis| self.window.renderer.move(.vertical, if (axis < 0) -0.1 else 0.1),
                         .motion => |motion| {
-                            const x = 1 / (self.renderer.scale.factor * self.renderer.texture.width / 2);
-                            const y = 1 / (self.renderer.scale.factor * self.renderer.texture.height / 2);
+                            const x = 1 / (self.window.renderer.scale.factor * self.window.renderer.texture.width / 2);
+                            const y = 1 / (self.window.renderer.scale.factor * self.window.renderer.texture.height / 2);
 
-                            self.renderer.move(.horizontal, @as(f32, @floatFromInt(motion.x)) * x);
-                            self.renderer.move(.vertical, @as(f32, @floatFromInt(motion.y)) * -y);
+                            self.window.renderer.move(.horizontal, @as(f32, @floatFromInt(motion.x)) * x);
+                            self.window.renderer.move(.vertical, @as(f32, @floatFromInt(motion.y)) * -y);
                         },
                     }
                 },
                 .resize => |dim| {
                     const width, const height = dim;
-                    self.renderer.setViewport(width, height);
+                    self.window.renderer.setViewport(width, height);
                 },
                 .image => |image| {
                     defer image.image.deinit();
                     self.index = image.index;
-                    self.renderer.setTexture(image.image);
+                    self.window.renderer.setTexture(image.image);
 
                     var buf = [_]u8{0} ** std.posix.NAME_MAX;
                     const title = try std.fmt.bufPrintZ(&buf, "{d} of {d} - {s}", .{ self.index + 1, self.path_list.items.len, std.fs.path.basename(self.path_list.items[@intCast(self.index)]) });
@@ -327,11 +320,7 @@ fn waitEvent(self: *App) !void {
 
 pub fn run(self: *App) !void {
     while (!self.window.shouldClose()) {
-        if (self.renderer.need_redraw) {
-            self.renderer.render();
-            try self.window.swapBuffers();
-        }
-
+        try self.window.draw();
         try self.waitEvent();
     }
 }

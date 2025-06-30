@@ -1,4 +1,4 @@
-pub const Renderer = @This();
+pub const TextureRenderer = @This();
 
 const std = @import("std");
 const gl = @import("gl.zig");
@@ -47,7 +47,7 @@ fit: Fit,
 zoom: bool,
 need_redraw: bool,
 
-pub fn init(width: f32, height: f32) !Renderer {
+pub fn init(width: f32, height: f32) !TextureRenderer {
     const vertices = [_]f32{
         1.0, 1.0, 0.0, 1.0, 1.0, // top right
         1.0, -1.0, 0.0, 1.0, 0.0, // bottom right
@@ -114,13 +114,13 @@ pub fn init(width: f32, height: f32) !Renderer {
     };
 }
 
-pub fn deinit(self: Renderer) void {
+pub fn deinit(self: TextureRenderer) void {
     self.shader.deinit();
     gl.glDeleteVertexArrays(1, &self.vao);
     gl.glDeleteBuffers(2, @ptrCast(&.{ self.vbo, self.ebo }));
 }
 
-fn setTransformations(self: *Renderer, update_scale_factor: bool) void {
+fn setTransformations(self: *TextureRenderer, update_scale_factor: bool) void {
     if (self.rotate == 0 or self.rotate == 180) {
         if (update_scale_factor) {
             self.scale.factor = switch (self.fit) {
@@ -150,7 +150,7 @@ fn setTransformations(self: *Renderer, update_scale_factor: bool) void {
     }
 }
 
-pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
+pub fn setViewport(self: *TextureRenderer, width: c_int, height: c_int) void {
     gl.glViewport(0, 0, width, height);
 
     self.viewport.width = @floatFromInt(width);
@@ -165,7 +165,7 @@ pub fn setViewport(self: *Renderer, width: c_int, height: c_int) void {
     self.need_redraw = true;
 }
 
-pub fn setTexture(self: *Renderer, image: Image) void {
+pub fn setTexture(self: *TextureRenderer, image: Image) void {
     self.texture.width = @floatFromInt(image.width);
     self.texture.height = @floatFromInt(image.height);
 
@@ -227,7 +227,7 @@ pub fn setTexture(self: *Renderer, image: Image) void {
     self.need_redraw = true;
 }
 
-pub fn setFit(self: *Renderer, fit: Fit) void {
+pub fn setFit(self: *TextureRenderer, fit: Fit) void {
     self.fit = fit;
     self.zoom = false;
     self.setTransformations(!self.zoom);
@@ -241,7 +241,7 @@ pub fn setFit(self: *Renderer, fit: Fit) void {
     self.need_redraw = true;
 }
 
-pub fn rotateTexture(self: *Renderer, angle: i32) void {
+pub fn rotateTexture(self: *TextureRenderer, angle: i32) void {
     self.rotate = @mod(self.rotate + angle, 360);
     self.setTransformations(!self.zoom);
     self.translate.x = @min(@max(self.translate.x, -self.translate.max_x), self.translate.max_x);
@@ -259,7 +259,7 @@ pub const Zoom = enum {
     out,
 };
 
-pub fn setZoom(self: *Renderer, zoom: Zoom) void {
+pub fn setZoom(self: *TextureRenderer, zoom: Zoom) void {
     self.scale.factor = switch (zoom) {
         .in => @max(self.scale.factor * @sqrt(2.0), 1.0 / 1024.0),
         .out => @min(self.scale.factor / @sqrt(2.0), 1024.0),
@@ -280,7 +280,7 @@ const Direction = enum {
     vertical,
 };
 
-pub fn move(self: *Renderer, direction: Direction, step: f32) void {
+pub fn move(self: *TextureRenderer, direction: Direction, step: f32) void {
     switch (self.rotate) {
         0 => switch (direction) {
             .horizontal => self.translate.x = @min(@max(self.translate.x + step, -self.translate.max_x), self.translate.max_x),
@@ -306,7 +306,7 @@ pub fn move(self: *Renderer, direction: Direction, step: f32) void {
     self.need_redraw = true;
 }
 
-pub fn render(self: *Renderer) void {
+pub fn render(self: *TextureRenderer) void {
     gl.glClearColor(0.0, 0.0, 0.0, 1.0);
     gl.glClear(gl.GL_COLOR_BUFFER_BIT);
     gl.glDrawElements(gl.GL_TRIANGLES, 6, gl.GL_UNSIGNED_INT, @ptrFromInt(0));

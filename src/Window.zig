@@ -17,6 +17,7 @@ const c = @cImport({
     @cUndef("WL_EGL_PLATFORM");
 });
 
+const TextureRenderer = @import("TextureRenderer.zig");
 const Keyboard = @import("Keyboard.zig");
 const Image = @import("Image.zig");
 
@@ -312,6 +313,8 @@ timer_id: c.timer_t,
 
 running: bool,
 
+renderer: TextureRenderer,
+
 pub const default: Window = .{
     .wl_display = undefined,
     .wl_registry = undefined,
@@ -342,9 +345,10 @@ pub const default: Window = .{
     .pipe_fds = undefined,
     .timer_id = undefined,
     .running = undefined,
+    .renderer = undefined,
 };
 
-pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]const u8) !void {
+pub fn init(self: *Window, width: c_int, height: c_int, image: Image, title: [:0]const u8) !void {
     self.wl_display = try wl.Display.connect(null);
     self.wl_display_fd = self.wl_display.getFd();
     self.pipe_fds = try std.posix.pipe();
@@ -463,10 +467,15 @@ pub fn init(self: *Window, width: c_int, height: c_int, title: [:0]const u8) !vo
     self.wl_surface.commit();
     if (self.wl_display.roundtrip() != .SUCCESS) return error.RoundtripFailed;
 
+    self.renderer = try TextureRenderer.init(@floatFromInt(width), @floatFromInt(height));
+    self.renderer.setTexture(image);
+
     self.running = true;
 }
 
 pub fn deinit(self: Window) void {
+    self.renderer.deinit();
+
     std.posix.close(self.pipe_fds[0]);
     std.posix.close(self.pipe_fds[1]);
 
@@ -494,7 +503,7 @@ pub fn setTitle(self: Window, title: [:0]const u8) void {
     self.xdg_toplevel.setTitle(title);
 }
 
-pub fn swapBuffers(self: Window) !void {
+fn swapBuffers(self: Window) !void {
     if (self.xdg_configured) {
         if (c.eglSwapBuffers(self.egl_display, self.egl_surface) != c.EGL_TRUE) {
             switch (c.eglGetError()) {
@@ -504,6 +513,13 @@ pub fn swapBuffers(self: Window) !void {
                 else => return error.FailedToSwapBuffers,
             }
         }
+    }
+}
+
+pub fn draw(self: *Window) !void {
+    if (self.renderer.need_redraw) {
+        self.renderer.render();
+        try self.swapBuffers();
     }
 }
 
