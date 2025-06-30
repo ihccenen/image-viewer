@@ -122,7 +122,14 @@ fn navigate(self: *App, step: i32) !void {
 fn removePathByWd(self: *App, wd: i32, step: i32) void {
     if (self.wds.fetchRemove(wd)) |kv| {
         const path = kv.value;
-        const index = self.getPathIndex(path) orelse unreachable;
+        const index = index: {
+            for (self.path_list.items, 0..) |item, i| {
+                if (std.mem.orderZ(u8, path, item) == .eq)
+                    break :index i;
+            }
+
+            unreachable;
+        };
         _ = self.path_list.orderedRemove(index);
 
         if (index < self.index or (index == self.index and self.index == 0))
@@ -199,14 +206,6 @@ fn pointerPressedHandler(self: *App, button: u32) !void {
         276 => try self.navigate(1),
         else => {},
     }
-}
-
-fn getPathIndex(self: App, path: [:0]const u8) ?usize {
-    for (self.path_list.items, 0..) |item, i| {
-        if (std.mem.orderZ(u8, path, item) == .eq) return i;
-    }
-
-    return null;
 }
 
 fn readWindowEvents(self: *App) !void {
