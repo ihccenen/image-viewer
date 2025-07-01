@@ -494,8 +494,9 @@ pub fn deinit(self: Window) void {
     self.wl_registry.destroy();
     self.wl_display.disconnect();
 
-    _ = c.eglTerminate(self.egl_display);
+    _ = c.eglDestroySurface(self.egl_display, self.egl_surface);
     _ = c.eglDestroyContext(self.egl_display, self.egl_context);
+    _ = c.eglTerminate(self.egl_display);
     self.egl_window.destroy();
 }
 
