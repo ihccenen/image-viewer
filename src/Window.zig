@@ -166,9 +166,12 @@ fn keyboardListener(_: *wl.Keyboard, event: wl.Keyboard.Event, window: *Window) 
     switch (event) {
         .keymap => |keymap| {
             defer std.posix.close(keymap.fd);
-            const map_shm = std.posix.mmap(null, keymap.size, std.posix.PROT.READ, .{ .TYPE = .SHARED }, keymap.fd, 0) catch return;
-            defer std.posix.munmap(map_shm);
-            window.keyboard.setKeymap(@ptrCast(map_shm));
+
+            if (keymap.format == .xkb_v1) {
+                const map_shm = std.posix.mmap(null, keymap.size, std.posix.PROT.READ, .{ .TYPE = .SHARED }, keymap.fd, 0) catch return;
+                defer std.posix.munmap(map_shm);
+                window.keyboard.setKeymap(@ptrCast(map_shm));
+            }
         },
         .enter => {},
         .leave => {},
